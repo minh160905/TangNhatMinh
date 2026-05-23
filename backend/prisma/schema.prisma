@@ -1,0 +1,311 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  role_id   Int    @id @default(autoincrement())
+  role_name String @db.VarChar(50)
+  users     User[]
+
+  @@map("roles")
+}
+
+model User {
+  user_id       Int      @id @default(autoincrement())
+  username      String   @unique @db.VarChar(50)
+  password_hash String   @db.VarChar(255)
+  full_name     String?  @db.VarChar(100)
+  email         String?  @db.VarChar(100)
+  phone         String?  @db.VarChar(20)
+  role_id       Int
+  status        UserStatus @default(ACTIVE)
+  created_at    DateTime @default(now())
+
+  role                   Role                    @relation(fields: [role_id], references: [role_id])
+  student                Student?
+  parent                 Parent?
+  homeroom_instances     ClassInstance[]         @relation("HomeroomTeacher")
+  teacher_assignments    TeacherAssignment[]
+  scores_created         Score[]                 @relation("ScoreCreatedBy")
+  comments_given         Comment[]               @relation("TeacherComment")
+  notifications_created  Notification[]
+  notification_receivers NotificationReceiver[]
+  achievements_reviewed  Achievement[]           @relation("AchievementReviewer")
+  achievement_comments   AchievementComment[]
+  schedules              Schedule[]              @relation("ScheduleTeacher")
+  conducts_given         Conduct[]               @relation("ConductTeacher")
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+model AcademicYear {
+  year_id    Int      @id @default(autoincrement())
+  name       String   @db.VarChar(20)
+  start_date DateTime @db.Date
+  end_date   DateTime @db.Date
+
+  class_instances ClassInstance[]
+  conducts        Conduct[]
+
+  @@map("academic_years")
+}
+
+model Class {
+  class_id   Int    @id @default(autoincrement())
+  class_code String @db.VarChar(10)
+
+  class_instances ClassInstance[]
+
+  @@map("classes")
+}
+
+model ClassInstance {
+  class_instance_id   Int  @id @default(autoincrement())
+  class_id            Int
+  year_id             Int
+  grade               Int
+  homeroom_teacher_id Int?
+
+  class            Class        @relation(fields: [class_id], references: [class_id])
+  year             AcademicYear @relation(fields: [year_id], references: [year_id])
+  homeroom_teacher User?        @relation("HomeroomTeacher", fields: [homeroom_teacher_id], references: [user_id])
+
+  students            Student[]
+  teacher_assignments TeacherAssignment[]
+  schedules           Schedule[]
+
+  @@map("class_instances")
+}
+
+model Student {
+  student_id        Int       @id @default(autoincrement())
+  user_id           Int       @unique
+  student_code      String?   @db.VarChar(20)
+  date_of_birth     DateTime? @db.Date
+  gender            String?   @db.VarChar(10)   // 'Nam' | 'Nữ'
+  hometown          String?   @db.VarChar(200)
+  class_instance_id Int?
+
+  user           User           @relation(fields: [user_id], references: [user_id])
+  class_instance ClassInstance? @relation(fields: [class_instance_id], references: [class_instance_id])
+
+  parents      StudentParent[]
+  scores       Score[]
+  comments     Comment[]
+  achievements Achievement[]
+  conducts     Conduct[]
+
+  @@map("students")
+}
+
+model Parent {
+  parent_id Int @id @default(autoincrement())
+  user_id   Int @unique
+
+  user     User            @relation(fields: [user_id], references: [user_id])
+  students StudentParent[]
+
+  @@map("parents")
+}
+
+model StudentParent {
+  student_id Int
+  parent_id  Int
+
+  student Student @relation(fields: [student_id], references: [student_id])
+  parent  Parent  @relation(fields: [parent_id], references: [parent_id])
+
+  @@id([student_id, parent_id])
+  @@map("student_parent")
+}
+
+model Subject {
+  subject_id   Int    @id @default(autoincrement())
+  subject_name String @db.VarChar(100)
+
+  teacher_assignments TeacherAssignment[]
+  scores              Score[]
+  schedules           Schedule[]
+
+  @@map("subjects")
+}
+
+model TeacherAssignment {
+  assignment_id     Int @id @default(autoincrement())
+  teacher_id        Int
+  class_instance_id Int
+  subject_id        Int
+
+  teacher        User          @relation(fields: [teacher_id], references: [user_id])
+  class_instance ClassInstance @relation(fields: [class_instance_id], references: [class_instance_id])
+  subject        Subject       @relation(fields: [subject_id], references: [subject_id])
+
+  @@map("teacher_assignments")
+}
+
+model Score {
+  score_id    Int       @id @default(autoincrement())
+  student_id  Int
+  subject_id  Int
+  semester    Int
+  score_type  ScoreType
+  score_value Float
+  order_no    Int?
+  created_by  Int?
+  updated_at  DateTime  @updatedAt
+
+  student    Student @relation(fields: [student_id], references: [student_id])
+  subject    Subject @relation(fields: [subject_id], references: [subject_id])
+  created_by_user User? @relation("ScoreCreatedBy", fields: [created_by], references: [user_id])
+
+  @@map("scores")
+}
+
+enum ScoreType {
+  TX
+  GK
+  CK
+}
+
+model Comment {
+  comment_id Int      @id @default(autoincrement())
+  student_id Int
+  teacher_id Int
+  semester   Int
+  content    String   @db.Text
+  created_at DateTime @default(now())
+
+  student Student @relation(fields: [student_id], references: [student_id])
+  teacher User    @relation("TeacherComment", fields: [teacher_id], references: [user_id])
+
+  @@map("comments")
+}
+
+model Conduct {
+  conduct_id Int           @id @default(autoincrement())
+  student_id Int
+  teacher_id Int
+  semester   Int
+  year_id    Int
+  rating     ConductRating
+  note       String?       @db.Text
+  updated_at DateTime      @updatedAt
+
+  student Student      @relation(fields: [student_id], references: [student_id])
+  teacher User         @relation("ConductTeacher", fields: [teacher_id], references: [user_id])
+  year    AcademicYear @relation(fields: [year_id], references: [year_id])
+
+  @@unique([student_id, semester, year_id])
+  @@map("conducts")
+}
+
+enum ConductRating {
+  EXCELLENT   // Tốt
+  GOOD        // Khá
+  AVERAGE     // Trung bình
+  WEAK        // Yếu
+}
+
+model Notification {
+  notification_id Int      @id @default(autoincrement())
+  title           String   @db.VarChar(255)
+  content         String   @db.Text
+  created_by      Int
+  created_at      DateTime @default(now())
+
+  creator   User                   @relation(fields: [created_by], references: [user_id])
+  receivers NotificationReceiver[]
+
+  @@map("notifications")
+}
+
+model NotificationReceiver {
+  id              Int     @id @default(autoincrement())
+  notification_id Int
+  user_id         Int
+  is_read         Boolean @default(false)
+
+  notification Notification @relation(fields: [notification_id], references: [notification_id])
+  user         User         @relation(fields: [user_id], references: [user_id])
+
+  @@map("notification_receivers")
+}
+
+model Achievement {
+  achievement_id Int               @id @default(autoincrement())
+  student_id     Int
+  title          String            @db.VarChar(255)
+  description    String?           @db.Text
+  category       String?           @db.VarChar(100)
+  status         AchievementStatus @default(PENDING)
+  submitted_at   DateTime          @default(now())
+  reviewed_by    Int?
+  reviewed_at    DateTime?
+
+  student  Student  @relation(fields: [student_id], references: [student_id])
+  reviewer User?    @relation("AchievementReviewer", fields: [reviewed_by], references: [user_id])
+
+  files    AchievementFile[]
+  comments AchievementComment[]
+
+  @@map("achievements")
+}
+
+enum AchievementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AchievementFile {
+  file_id        Int    @id @default(autoincrement())
+  achievement_id Int
+  file_url       String @db.VarChar(255)
+  file_type      String @db.VarChar(50)
+
+  achievement Achievement @relation(fields: [achievement_id], references: [achievement_id])
+
+  @@map("achievement_files")
+}
+
+model AchievementComment {
+  id             Int      @id @default(autoincrement())
+  achievement_id Int
+  teacher_id     Int
+  comment        String   @db.Text
+  created_at     DateTime @default(now())
+
+  achievement Achievement @relation(fields: [achievement_id], references: [achievement_id])
+  teacher     User        @relation(fields: [teacher_id], references: [user_id])
+
+  @@map("achievement_comments")
+}
+
+// ── Thời khoá biểu ────────────────────────────────────────────────────────────
+model Schedule {
+  schedule_id       Int    @id @default(autoincrement())
+  class_instance_id Int
+  day_of_week       Int    // 2-7: Thứ 2 → Thứ 7
+  period            Int    // 1-10: Tiết 1 → Tiết 10
+  subject_id        Int
+  teacher_id        Int
+  room              String? @db.VarChar(20)
+
+  class_instance ClassInstance @relation(fields: [class_instance_id], references: [class_instance_id])
+  subject        Subject       @relation(fields: [subject_id], references: [subject_id])
+  teacher        User          @relation("ScheduleTeacher", fields: [teacher_id], references: [user_id])
+
+  @@unique([class_instance_id, day_of_week, period])
+  @@map("schedules")
+}
