@@ -36,6 +36,25 @@ router.post('/upsert', authorize('ADMIN'), async (req, res, next) => {
   try { success(res, await svc.upsert(req.body)); } catch (e) { next(e); }
 });
 
+// Admin: Tự động tạo TKB – chỉ preview, chưa lưu DB
+router.post('/auto-generate', authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const result = await svc.autoGenerate(req.body);
+    success(res, result);
+  } catch (e) { next(e); }
+});
+
+// Admin: Áp dụng TKB đã generate vào DB
+router.post('/auto-apply', authorize('ADMIN'), async (req, res, next) => {
+  try {
+    if (!req.body?.scheduled?.length) {
+      return res.status(400).json({ success: false, message: 'Không có dữ liệu TKB để áp dụng' });
+    }
+    const result = await svc.autoApply(req.body.scheduled);
+    success(res, result);
+  } catch (e) { next(e); }
+});
+
 // Admin: xóa một ô TKB
 router.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
   try { success(res, await svc.remove(req.params.id)); } catch (e) { next(e); }

@@ -97,4 +97,16 @@ const getAll = async (filters = {}) => {
   return prisma.schedule.findMany({ where, include: INCLUDE, orderBy: [{ class_instance_id: 'asc' }, { day_of_week: 'asc' }, { period: 'asc' }] });
 };
 
-module.exports = { getByClass, getByTeacher, getByStudent, getByParent, upsert, remove, clearClass, getAll };
+/** Auto-generate TKB (preview only – không lưu DB) */
+const autoGenerate = async (options) => {
+  const autoSvc = require('./auto-schedule.service');
+  return autoSvc.generate(options);
+};
+
+/** Áp dụng TKB đã generate vào DB */
+const autoApply = async (scheduledSlots) => {
+  const autoSvc = require('./auto-schedule.service');
+  return autoSvc.applySchedule(scheduledSlots);
+};
+
+module.exports = { getByClass, getByTeacher, getByStudent, getByParent, upsert, remove, clearClass, getAll, autoGenerate, autoApply };

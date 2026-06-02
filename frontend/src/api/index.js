@@ -89,6 +89,8 @@ export const schedulesApi = {
   upsert: (data) => api.post('/schedules/upsert', data),
   remove: (id) => api.delete(`/schedules/${id}`),
   clearClass: (classInstanceId) => api.delete(`/schedules/class/${classInstanceId}`),
+  autoGenerate: (config) => api.post('/schedules/auto-generate', config),
+  autoApply: (scheduled) => api.post('/schedules/auto-apply', { scheduled }),
 };
 
 export const conductsApi = {
