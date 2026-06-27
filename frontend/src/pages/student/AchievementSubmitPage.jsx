@@ -116,6 +116,28 @@ export default function AchievementSubmitPage() {
     },
   ];
 
+  const approvedAchievements = achievements.filter(a => a.status === 'APPROVED');
+
+  const approvedColumns = [
+    { title: 'Tiêu đề', dataIndex: 'title', render: t => <Text strong style={{ color: '#111827' }}>{t}</Text> },
+    { title: 'Thể loại', dataIndex: 'category', render: v => <Tag color="purple">{v}</Tag> },
+    { title: 'Ngày duyệt', render: (_, r) => <Text style={{ color: '#6B7280', fontSize: 12 }}>{r.reviewed_at ? dayjs(r.reviewed_at).format('DD/MM/YYYY') : '—'}</Text> },
+    { title: 'Người duyệt', render: (_, r) => <Text style={{ color: '#111827', fontSize: 13 }}>{r.reviewer?.full_name || 'GVCN'}</Text> },
+    {
+      title: 'Minh chứng', render: (_, r) => r.files?.length > 0
+        ? <Tag color="cyan" icon={<FileOutlined />}>{r.files.length} file</Tag>
+        : <Text style={{ color: '#475569' }}>—</Text>,
+    },
+    {
+      title: '', render: (_, r) => (
+        <Button size="small" icon={<EyeOutlined />} onClick={() => setDetailItem(r)}
+          style={{ borderRadius: 6, borderColor: '#10B981', color: '#10B981' }}>
+          Chi tiết
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div>
       <div className="page-header">
@@ -169,13 +191,25 @@ export default function AchievementSubmitPage() {
           </Form>
         </div>
 
-        {/* Lịch sử */}
-        <div style={{ background: '#fff', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 24 }}>
-          <Text strong style={{ color: '#4F46E5', fontSize: 16, display: 'block', marginBottom: 16 }}>
-            📋 Lịch sử gửi ({achievements.length})
-          </Text>
-          <Table dataSource={achievements} columns={columns} rowKey="achievement_id"
-            loading={isLoading} pagination={{ pageSize: 10 }} size="middle" />
+        {/* Lịch sử & Thành tích đã được duyệt */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Lịch sử gửi */}
+          <div style={{ background: '#fff', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 24 }}>
+            <Text strong style={{ color: '#4F46E5', fontSize: 16, display: 'block', marginBottom: 16 }}>
+              📋 Lịch sử gửi ({achievements.length})
+            </Text>
+            <Table dataSource={achievements} columns={columns} rowKey="achievement_id"
+              loading={isLoading} pagination={{ pageSize: 5 }} size="middle" />
+          </div>
+
+          {/* Thành tích đã được duyệt */}
+          <div style={{ background: '#fff', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 24 }}>
+            <Text strong style={{ color: '#10B981', fontSize: 16, display: 'block', marginBottom: 16 }}>
+              🏆 Thành tích đã được duyệt ({approvedAchievements.length})
+            </Text>
+            <Table dataSource={approvedAchievements} columns={approvedColumns} rowKey="achievement_id"
+              loading={isLoading} pagination={{ pageSize: 5 }} size="middle" />
+          </div>
         </div>
       </div>
 
@@ -194,7 +228,7 @@ export default function AchievementSubmitPage() {
                 {STATUS_CONFIG[detailItem.status]?.label}
               </span>
             </div>
-            <Paragraph style={{ color: '#94A3B8', background: 'rgba(15,14,30,0.5)', padding: 12, borderRadius: 8 }}>
+            <Paragraph style={{ color: '#374151', background: '#F3F4F6', border: '1px solid #E5E7EB', padding: 12, borderRadius: 8 }}>
               {detailItem.description || 'Không có mô tả'}
             </Paragraph>
 
@@ -211,9 +245,9 @@ export default function AchievementSubmitPage() {
               <div>
                 <Text style={{ color: '#4F46E5', display: 'block', marginBottom: 8 }}>💬 Nhận xét từ GVCN:</Text>
                 {detailItem.comments.map((c, i) => (
-                  <div key={i} style={{ background: 'rgba(15,14,30,0.5)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
-                    <Text strong style={{ color: '#60A5FA', fontSize: 13 }}>{c.teacher?.full_name}</Text>
-                    <Paragraph style={{ color: '#111827', margin: '4px 0 0' }}>{c.comment}</Paragraph>
+                  <div key={i} style={{ background: '#EEF2FF', border: '1px solid #E0E7FF', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                    <Text strong style={{ color: '#4F46E5', fontSize: 13 }}>{c.teacher?.full_name}</Text>
+                    <Paragraph style={{ color: '#374151', margin: '4px 0 0' }}>{c.comment}</Paragraph>
                   </div>
                 ))}
               </div>

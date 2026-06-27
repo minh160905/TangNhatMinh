@@ -45,14 +45,16 @@ export default function TimetableGrid({
   loading = false,
   onCellClick = null,
   highlightTeacherId = null,
+  onLessonClick = null,
 }) {
   if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>;
-  if (!schedules.length) return <Empty description={<span style={{ color: '#9CA3AF' }}>Chưa có thời khoá biểu</span>} style={{ padding: 40 }} />;
+  if (!schedules.length && !onCellClick) return <Empty description={<span style={{ color: '#9CA3AF' }}>Chưa có thời khoá biểu</span>} style={{ padding: 40 }} />;
 
   const map = {};
   for (const s of schedules) map[`${s.day_of_week}-${s.period}`] = s;
 
-  const usedDays = DAYS.filter(d => schedules.some(s => s.day_of_week === d.value));
+  const hasSaturday = schedules.some(s => s.day_of_week === 7);
+  const usedDays = DAYS.filter(d => d.value <= 6 || (d.value === 7 && hasSaturday));
   const maxPeriod = Math.max(...schedules.map(s => s.period), 6);
   const usedPeriods = PERIODS.filter(p => p <= maxPeriod);
   const isEditable = typeof onCellClick === 'function';
@@ -102,13 +104,19 @@ export default function TimetableGrid({
                   return (
                     <td key={d.value} style={{
                       ...TD, padding: 6,
-                      cursor: isEditable ? 'pointer' : 'default',
+                      cursor: isEditable ? 'pointer' : (onLessonClick && cell ? 'pointer' : 'default'),
                       transition: 'background 0.15s',
                       background: isMyLesson ? '#EEF2FF' : undefined,
                     }}
-                      onClick={() => isEditable && onCellClick(d.value, period, cell)}
-                      onMouseEnter={e => { if (isEditable) e.currentTarget.style.background = '#F5F7FF'; }}
-                      onMouseLeave={e => { if (isEditable) e.currentTarget.style.background = isMyLesson ? '#EEF2FF' : ''; }}
+                      onClick={() => {
+                        if (isEditable) {
+                          onCellClick(d.value, period, cell);
+                        } else if (onLessonClick && cell) {
+                          onLessonClick(cell);
+                        }
+                      }}
+                      onMouseEnter={e => { if (isEditable || (onLessonClick && cell)) e.currentTarget.style.background = '#F5F7FF'; }}
+                      onMouseLeave={e => { if (isEditable || (onLessonClick && cell)) e.currentTarget.style.background = isMyLesson ? '#EEF2FF' : ''; }}
                     >
                       {cell ? (
                         <Tooltip title={`${cell.subject?.subject_name} · GV: ${cell.teacher?.full_name} · ${PERIOD_TIMES[period]}`}>

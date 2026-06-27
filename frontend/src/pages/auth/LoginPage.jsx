@@ -10,10 +10,10 @@ const { Title, Text } = Typography;
 
 const demoAccounts = [
   { label: 'Admin',      username: 'admin',          password: 'Admin@123',   color: '#7C3AED', bg: '#F5F3FF' },
-  { label: 'GV CN',      username: 'gv_chunhiem',    password: 'Teacher@123', color: '#4F46E5', bg: '#EEF2FF' },
-  { label: 'GV bộ môn', username: 'gv_nochunhiem',  password: 'Teacher@123', color: '#6366F1', bg: '#EEF2FF' },
-  { label: 'Học sinh 1', username: 'hocsinh1',       password: 'Student@123', color: '#059669', bg: '#ECFDF5' },
-  { label: 'Học sinh 2', username: 'hocsinh2',       password: 'Student@123', color: '#10B981', bg: '#ECFDF5' },
+  { label: 'Hiệu trưởng', username: 'gv_hieutruong',  password: 'Teacher@123', color: '#B91C1C', bg: '#FEF2F2' },
+  { label: 'Tổ trưởng Toán', username: 'gv_chunhiem', password: 'Teacher@123', color: '#0F766E', bg: '#F0FDFA' },
+  { label: 'Học sinh 1', username: 'hocsinh1',       password: 'Student@123', color: '#4F46E5', bg: '#EEF2FF' },
+  { label: 'GV bộ môn thường', username: 'gv_bomon', password: 'Teacher@123', color: '#10B981', bg: '#ECFDF5' },
   { label: 'Phụ huynh',  username: 'phuhuynh1',      password: 'Parent@123',  color: '#2563EB', bg: '#EFF6FF' },
 ];
 
@@ -119,9 +119,6 @@ export default function LoginPage() {
           borderRadius: 16, padding: 16,
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         }}>
-          <Text style={{ color: '#9CA3AF', fontSize: 12, display: 'block', marginBottom: 10, textAlign: 'center', fontWeight: 500 }}>
-            🧪 Tài khoản demo — nhấn để điền tự động
-          </Text>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {demoAccounts.map((acc) => (
               <button

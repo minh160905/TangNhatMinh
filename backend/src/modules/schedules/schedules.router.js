@@ -12,7 +12,7 @@ router.get('/class/:classInstanceId', async (req, res, next) => {
 });
 
 // GV xem TKB của mình
-router.get('/my-schedule', authorize('TEACHER'), async (req, res, next) => {
+router.get('/my-schedule', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try { success(res, await svc.getByTeacher(req.user.userId)); } catch (e) { next(e); }
 });
 

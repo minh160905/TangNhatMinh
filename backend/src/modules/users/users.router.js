@@ -6,8 +6,8 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 router.use(authenticate);
 
 router.get('/roles', ctrl.getRoles);
-router.get('/', authorize('ADMIN'), ctrl.getAll);
-router.get('/:id', authorize('ADMIN'), ctrl.getById);
+router.get('/', authorize('ADMIN', 'PRINCIPAL'), ctrl.getAll);
+router.get('/:id', authorize('ADMIN', 'PRINCIPAL'), ctrl.getById);
 router.post('/', authorize('ADMIN'), ctrl.create);
 router.put('/:id', authorize('ADMIN'), ctrl.update);
 router.patch('/:id/status', authorize('ADMIN'), ctrl.updateStatus);

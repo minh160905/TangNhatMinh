@@ -1,12 +1,13 @@
 /**
  * SEED FILE – EduManager THPT
  * Dữ liệu mẫu đầy đủ theo yêu cầu:
- *  – 6 lớp: 10A, 10B, 11A, 11B, 12A, 12B
- *  – 10 học sinh / lớp (60 HS tổng)
- *  – 6 phụ huynh cho 6 HS ngẫu nhiên
- *  – 8 môn học + 8 giáo viên
- *  – 6/8 GV làm GVCN
- *  – 2 kỳ học, điểm số đầy đủ tất cả môn
+ *  – 9 lớp: 10A, 10B, 10C, 11A, 11B, 11C, 12A, 12B, 12C
+ *  – 10 học sinh / lớp (90 HS tổng)
+ *  – 9 phụ huynh cho 9 HS ngẫu nhiên
+ *  – 8 môn học + 32 giáo viên (4 GV/môn, 3 GV mới thêm vào mỗi tổ)
+ *  – 9/32 GV làm GVCN
+ *  – 2 kỳ học, điểm số đầy đủ tất cả môn, gán year_id đầy đủ
+ *  – Tự động sinh thời khóa biểu cho tất cả các lớp
  *  – Tài khoản demo rõ ràng
  */
 
@@ -28,7 +29,8 @@ const MALE_NAMES = [
   'Mai Xuân Thành', 'Hồ Đình Tuấn', 'Lê Bá Uy', 'Trịnh Văn Vũ',
   'Nguyễn Hữu Xuân', 'Phạm Công Yên', 'Dương Quốc Anh', 'Tạ Đình Bình',
   'Đào Văn Chi', 'Hà Minh Dương', 'Trương Quốc Đạt', 'Bùi Văn Giang',
-  'Đinh Đức Hòa', 'Lê Minh Khải',
+  'Đinh Đức Hòa', 'Lê Minh Khải', 'Lý Hoàng Phi', 'Trần Minh Trí',
+  'Phạm Thế Vũ', 'Bùi Xuân Trường', 'Hoàng Anh Tú', 'Đỗ Thành Đạt'
 ];
 
 const FEMALE_NAMES = [
@@ -39,18 +41,16 @@ const FEMALE_NAMES = [
   'Mai Thị Yến', 'Hồ Thị Zân', 'Lê Thị An', 'Trịnh Thị Bé',
   'Nguyễn Thị Cẩm', 'Phạm Thị Diệu', 'Dương Thị Giang', 'Tạ Thị Hoa',
   'Đào Thị Hương', 'Hà Thị Khánh', 'Trương Thị Lan', 'Bùi Thị Mơ',
-  'Đinh Thị Nga', 'Lê Thị Phú',
+  'Đinh Thị Nga', 'Lê Thị Phú', 'Phan Hoài An', 'Trần Mỹ Lệ',
+  'Vũ Thu Trang', 'Hoàng Ngọc Vy', 'Đặng Mai Phương', 'Lê Cẩm Tú'
 ];
 
-// Ghép cả hai danh sách, lần lượt nam/nữ
+// Ghép danh sách học sinh
 const ALL_STUDENT_NAMES = [];
-for (let i = 0; i < 30; i++) {
+for (let i = 0; i < Math.min(MALE_NAMES.length, FEMALE_NAMES.length); i++) {
   ALL_STUDENT_NAMES.push({ name: MALE_NAMES[i], gender: 'M' });
   ALL_STUDENT_NAMES.push({ name: FEMALE_NAMES[i], gender: 'F' });
 }
-
-const PROVINCES = ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Huế', 'Cần Thơ', 'Hải Phòng'];
-const DISTRICTS = ['Quận 1', 'Quận Hoàn Kiếm', 'Quận Hải Châu', 'Phường Trung Tâm', 'Quận Ninh Kiều', 'Quận Lê Chân'];
 
 const TEACHER_INFO = [
   { name: 'Nguyễn Văn Toán',   subject: 'Toán',       email: 'toan@school.edu.vn',   phone: '0901111001' },
@@ -63,21 +63,61 @@ const TEACHER_INFO = [
   { name: 'Bùi Đức Anh',       subject: 'Tiếng Anh',  email: 'anh@school.edu.vn',   phone: '0901111008' },
 ];
 
-// 6 trong 8 GV được phân công GVCN cho 6 lớp
-// GV Sử (idx 4) và GV Địa (idx 5) KHÔNG làm GVCN
-const GVCN_TEACHER_INDICES = [0, 1, 2, 3, 6, 7]; // Toán, Lý, Hóa, Sinh, Văn, TiếngAnh
+const EXTRA_TEACHER_NAMES = [
+  // Toán
+  ['Phạm Văn Đại', 'Lê Hữu Hải', 'Nguyễn Thị Hồng'],
+  // Lý
+  ['Trần Quốc Huy', 'Bùi Thị Dung', 'Nguyễn Minh Tuấn'],
+  // Hóa
+  ['Phan Thanh Sơn', 'Vũ Thị Thúy', 'Nguyễn Văn Minh'],
+  // Sinh
+  ['Đỗ Đức Thịnh', 'Lê Thị Thu', 'Nguyễn Hoàng Nam'],
+  // Sử
+  ['Trần Văn Hùng', 'Phạm Minh Trí', 'Hoàng Thị Thanh'],
+  // Địa
+  ['Nguyễn Thị Mai', 'Đặng Quốc Bảo', 'Vũ Văn Kiên'],
+  // Văn
+  ['Lê Thị Lan', 'Bùi Văn Sang', 'Trần Thị Thảo'],
+  // Tiếng Anh
+  ['Nguyễn Anh Tuấn', 'Phạm Thị Trang', 'Lê Minh Thành']
+];
 
 const CLASS_CONFIG = [
   { code: 'A', grade: 10 },
   { code: 'B', grade: 10 },
+  { code: 'C', grade: 10 },
   { code: 'A', grade: 11 },
   { code: 'B', grade: 11 },
+  { code: 'C', grade: 11 },
   { code: 'A', grade: 12 },
   { code: 'B', grade: 12 },
+  { code: 'C', grade: 12 },
 ];
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
+  console.log('🗑️  Đang dọn dẹp dữ liệu cũ...');
+  await prisma.schedule.deleteMany({});
+  await prisma.achievementComment.deleteMany({});
+  await prisma.achievement.deleteMany({});
+  await prisma.comment.deleteMany({});
+  await prisma.conduct.deleteMany({});
+  await prisma.score.deleteMany({});
+  await prisma.notificationReceiver.deleteMany({});
+  await prisma.notification.deleteMany({});
+  await prisma.studentParent.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.student.deleteMany({});
+  await prisma.teacherAssignment.deleteMany({});
+  await prisma.departmentMember.deleteMany({});
+  await prisma.department.deleteMany({});
+  await prisma.subject.deleteMany({});
+  await prisma.classInstance.deleteMany({});
+  await prisma.class.deleteMany({});
+  await prisma.academicYear.deleteMany({});
+  await prisma.user.deleteMany({});
+  console.log('✅ Đã dọn dẹp xong cơ sở dữ liệu');
+
   console.log('🌱 Bắt đầu seed dữ liệu đầy đủ...\n');
 
   // ── 1. Roles ──────────────────────────────────────────────────────────────
@@ -87,10 +127,12 @@ async function main() {
       { role_id: 2, role_name: 'TEACHER' },
       { role_id: 3, role_name: 'STUDENT' },
       { role_id: 4, role_name: 'PARENT' },
+      { role_id: 5, role_name: 'PRINCIPAL' },
+      { role_id: 6, role_name: 'HEAD_OF_DEPARTMENT' },
     ],
     skipDuplicates: true,
   });
-  console.log('✅ Roles: ADMIN, TEACHER, STUDENT, PARENT');
+  console.log('✅ Roles: ADMIN, TEACHER, STUDENT, PARENT, PRINCIPAL, HEAD_OF_DEPARTMENT');
 
   // ── 2. Admin ───────────────────────────────────────────────────────────────
   const adminUser = await prisma.user.create({
@@ -106,6 +148,20 @@ async function main() {
   });
   console.log('✅ Admin: admin / Admin@123');
 
+  // ── 2b. Hiệu trưởng (PRINCIPAL) ───────────────────────────────────────────
+  const principalUser = await prisma.user.create({
+    data: {
+      username: 'gv_hieutruong',
+      password_hash: hash('Teacher@123'),
+      full_name: 'Nguyễn Thế Dân',
+      email: 'hieutruong@school.edu.vn',
+      phone: '0901111999',
+      role_id: 5,
+      status: 'ACTIVE',
+    },
+  });
+  console.log('✅ Hiệu trưởng: gv_hieutruong / Teacher@123');
+
   // ── 3. Môn học ─────────────────────────────────────────────────────────────
   const subjects = [];
   for (const info of TEACHER_INFO) {
@@ -114,8 +170,10 @@ async function main() {
   }
   console.log(`✅ Môn học: ${subjects.map(s => s.subject_name).join(', ')}`);
 
-  // ── 4. Giáo viên (8 GV, mỗi GV phụ trách 1 môn) ──────────────────────────
+  // ── 4. Giáo viên (32 giáo viên, 4 GV/tổ) ──────────────────────────
   const teachers = [];
+  
+  // 4a. 8 Giáo viên cốt cán (Tổ trưởng tương lai)
   for (let i = 0; i < TEACHER_INFO.length; i++) {
     const info = TEACHER_INFO[i];
     const username = `gv_${info.subject.toLowerCase().replace(/[^a-z]/g, '').substring(0, 6)}`;
@@ -133,32 +191,97 @@ async function main() {
     teachers.push({ user: t, subjectId: subjects[i].subject_id, subjectName: info.subject });
   }
 
-  // Tài khoản demo rõ ràng:
-  // - GV không chủ nhiệm: teacher_su (index 4 – GV Sử)
-  // - GV chủ nhiệm: teacher_toan (index 0 – GV Toán, GVCN 10A)
-  // Đổi username để dễ nhớ
-  await prisma.user.update({ where: { user_id: teachers[4].user.user_id }, data: { username: 'gv_nochunhiem' } });
+  // 4b. 24 Giáo viên thành viên mới (3 giáo viên mới mỗi tổ)
+  for (let i = 0; i < subjects.length; i++) {
+    const subj = subjects[i];
+    const subjectCode = subj.subject_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 6);
+    
+    for (let extraIdx = 0; extraIdx < 3; extraIdx++) {
+      const name = EXTRA_TEACHER_NAMES[i][extraIdx];
+      const username = `gv_${subjectCode}_${extraIdx + 2}`;
+      const t = await prisma.user.create({
+        data: {
+          username,
+          password_hash: hash('Teacher@123'),
+          full_name: name,
+          email: `${subjectCode}${extraIdx + 2}@school.edu.vn`,
+          phone: `0901${String(i).padStart(2, '0')}${String(extraIdx + 10).padStart(3, '0')}`,
+          role_id: 2,
+          status: 'ACTIVE',
+        }
+      });
+      teachers.push({ user: t, subjectId: subj.subject_id, subjectName: subj.subject_name });
+    }
+  }
+
+  // Cấu hình tài khoản đặc biệt và Tổ trưởng
+  // - GV Toán cốt cán (teachers[0]) được đổi username thành gv_chunhiem (HEAD_OF_DEPARTMENT + GVCN 10A)
   await prisma.user.update({ where: { user_id: teachers[0].user.user_id }, data: { username: 'gv_chunhiem' } });
 
-  console.log('✅ 8 Giáo viên tạo xong:');
-  teachers.forEach((t, i) => console.log(`   [${i}] ${t.user.username.padEnd(16)} → dạy ${t.subjectName} ${GVCN_TEACHER_INDICES.includes(i) ? '(GVCN)' : '(không GVCN)'}`));
+  // Thiết lập toàn bộ 8 GV cốt cán làm HEAD_OF_DEPARTMENT (Tổ trưởng)
+  for (let i = 0; i < 8; i++) {
+    await prisma.user.update({
+      where: { user_id: teachers[i].user.user_id },
+      data: { role_id: 6 } // HEAD_OF_DEPARTMENT
+    });
+  }
 
-  // ── 5. Năm học ─────────────────────────────────────────────────────────────
+  // ── 5. Tổ chuyên môn & gán thành viên ─────────────────────────────────────
+  console.log('🌱 Đang tạo tổ chuyên môn và gán thành viên...');
+  for (let i = 0; i < subjects.length; i++) {
+    const subject = subjects[i];
+    const dept = await prisma.department.create({
+      data: {
+        department_name: `Tổ ${subject.subject_name}`,
+        subject_id: subject.subject_id,
+        head_teacher_id: teachers[i].user.user_id, // Tổ trưởng chuyên môn
+      },
+    });
+
+    // Lọc tất cả thành viên thuộc tổ này (gồm 1 tổ trưởng + 3 giáo viên mới)
+    const deptTeachers = teachers.filter(t => t.subjectId === subject.subject_id);
+    for (const t of deptTeachers) {
+      await prisma.departmentMember.create({
+        data: {
+          department_id: dept.department_id,
+          teacher_id: t.user.user_id,
+        },
+      });
+    }
+  }
+  console.log('✅ Đã thiết lập các tổ chuyên môn và gán thành viên');
+
+  // ── 6. Năm học ─────────────────────────────────────────────────────────────
   const year = await prisma.academicYear.create({
     data: { name: '2024-2025', start_date: new Date('2024-09-02'), end_date: new Date('2025-05-31') },
   });
-  console.log(`\n✅ Năm học: ${year.name}`);
+  console.log(`✅ Năm học: ${year.name}`);
 
-  // ── 6. Lớp cơ bản (class codes: A, B) ─────────────────────────────────────
+  // ── 7. Lớp cơ bản (A, B, C) ────────────────────────────────────────────────
   const classA = await prisma.class.create({ data: { class_code: 'A' } });
   const classB = await prisma.class.create({ data: { class_code: 'B' } });
-  const classMap = { A: classA, B: classB };
+  const classC = await prisma.class.create({ data: { class_code: 'C' } });
+  const classMap = { A: classA, B: classB, C: classC };
 
-  // ── 7. Class instances + gán GVCN ─────────────────────────────────────────
+  // ── 7b. Class instances + gán GVCN tự động ──────────────────────────────────
+  // GVCN gán tuần tự cho các lớp:
+  // 10A -> index 0 (gv_chunhiem - Toán)
+  // 10B -> index 1 (gv_l - Lý)
+  // 10C -> index 8 (gv_toan_2 - Toán phụ)
+  // 11A -> index 2 (gv_ha - Hóa)
+  // 11B -> index 3 (gv_sinh - Sinh)
+  // 11C -> index 11 (gv_ly_2 - Lý phụ)
+  // 12A -> index 6 (gv_vn - Văn)
+  // 12B -> index 7 (gv_tingan - Anh)
+  // 12C -> index 14 (gv_hoa_2 - Hóa phụ)
   const classInstances = [];
+  const gvcnIndicesMap = [0, 1, 8, 2, 3, 11, 6, 7, 14];
+
   for (let i = 0; i < CLASS_CONFIG.length; i++) {
     const cfg = CLASS_CONFIG[i];
-    const gvcnTeacher = teachers[GVCN_TEACHER_INDICES[i]];
+    const teacherIdx = gvcnIndicesMap[i];
+    const gvcnTeacher = teachers[teacherIdx];
+
     const ci = await prisma.classInstance.create({
       data: {
         class_id: classMap[cfg.code].class_id,
@@ -170,23 +293,29 @@ async function main() {
     classInstances.push({ instance: ci, grade: cfg.grade, code: cfg.code, gvcn: gvcnTeacher });
     console.log(`   Lớp ${cfg.grade}${cfg.code} → GVCN: ${gvcnTeacher.user.full_name}`);
   }
-  console.log('✅ 6 lớp học đã tạo và gán GVCN');
+  console.log('✅ 9 lớp học đã tạo và gán GVCN tự động');
 
-  // ── 8. Phân công tất cả GV dạy tất cả lớp ─────────────────────────────────
-  for (const ci of classInstances) {
-    for (const t of teachers) {
+  // ── 8. Phân công giảng dạy tự động (Xoay vòng) ───────────────────────────
+  console.log('\n⏳ Đang phân công giảng dạy cho 9 lớp × 8 môn...');
+  for (let ciIdx = 0; ciIdx < classInstances.length; ciIdx++) {
+    const ci = classInstances[ciIdx];
+    for (const subj of subjects) {
+      const deptTeachers = teachers.filter(t => t.subjectId === subj.subject_id);
+      const t = deptTeachers[ciIdx % deptTeachers.length]; // Xoay vòng 4 giáo viên
+
       await prisma.teacherAssignment.create({
         data: {
           teacher_id: t.user.user_id,
           class_instance_id: ci.instance.class_instance_id,
-          subject_id: t.subjectId,
+          subject_id: subj.subject_id,
         },
       });
     }
   }
-  console.log('✅ Phân công 8 GV × 6 lớp (48 phân công)');
+  console.log('✅ Phân công giảng dạy tự động hoàn tất');
 
-  // ── 9. Học sinh (10 HS/lớp = 60 HS) ──────────────────────────────────────
+  // ── 9. Học sinh (10 HS/lớp = 90 HS) ──────────────────────────────────────
+  console.log('\n🌱 Đang tạo học sinh...');
   const allStudents = [];
   let nameIdx = 0;
 
@@ -235,18 +364,17 @@ async function main() {
   }
   console.log(`✅ Tổng: ${allStudents.length} học sinh`);
 
-  // ── 10. Demo student accounts ─────────────────────────────────────────────
-  // Đổi 2 HS đầu tiên (lớp 10A) thành username dễ nhớ
+  // ── 10. Demo accounts ─────────────────────────────────────────────────────
   await prisma.user.update({ where: { user_id: allStudents[0].user.user_id }, data: { username: 'hocsinh1' } });
-  await prisma.user.update({ where: { user_id: allStudents[1].user.user_id }, data: { username: 'hocsinh2' } });
-  console.log(`✅ Demo: hocsinh1 (${allStudents[0].student.student_code}) và hocsinh2 (${allStudents[1].student.student_code}) – lớp 10A`);
+  await prisma.user.update({ where: { user_id: teachers[9].user.user_id }, data: { username: 'gv_bomon' } });
+  console.log(`✅ Demo: hocsinh1 (${allStudents[0].student.student_code}) và gv_bomon (GV bộ môn Toán – Lê Hữu Hải)`);
 
-  // ── 11. Phụ huynh (6 PH cho 6 HS ngẫu nhiên) ─────────────────────────────
-  // Chọn 6 HS từ 6 lớp khác nhau (HS số 5 của mỗi lớp)
-  const parentStudentIndices = [4, 14, 24, 34, 44, 54]; // HS thứ 5 của mỗi lớp
-
+  // ── 11. Phụ huynh (9 PH cho 9 HS ngẫu nhiên) ─────────────────────────────
+  console.log('\n🌱 Đang tạo phụ huynh liên kết...');
+  const parentStudentIndices = [4, 14, 24, 34, 44, 54, 64, 74, 84]; // HS thứ 5 của mỗi lớp
   const parents = [];
-  for (let i = 0; i < 6; i++) {
+
+  for (let i = 0; i < 9; i++) {
     const hs = allStudents[parentStudentIndices[i]];
     const parentName = `Phụ huynh của ${hs.user.full_name}`;
     const parentUsername = i === 0 ? 'phuhuynh1' : `ph_${hs.student.student_code.toLowerCase()}`;
@@ -271,27 +399,34 @@ async function main() {
 
     parents.push({ user: parentUser, parent, linkedStudent: hs });
   }
-  console.log(`✅ 6 Phụ huynh tạo xong (phuhuynh1 / Parent@123 → liên kết với ${allStudents[4].user.full_name})`);
+  console.log(`✅ 9 Phụ huynh tạo xong (phuhuynh1 liên kết với ${allStudents[4].user.full_name})`);
 
   // ── 12. Điểm số – 2 kỳ, tất cả môn, tất cả HS ────────────────────────────
-  console.log('\n⏳ Đang tạo điểm số cho 60 học sinh × 8 môn × 2 kỳ...');
-
+  console.log('\n⏳ Đang tạo điểm số cho 90 học sinh × 8 môn × 2 kỳ...');
   let scoreCount = 0;
+
   for (const sem of [1, 2]) {
     for (const hs of allStudents) {
+      const classAssignments = await prisma.teacherAssignment.findMany({
+        where: { class_instance_id: hs.classInstanceId }
+      });
+      
       for (const subj of subjects) {
-        // TX: 3 điểm mỗi học kỳ
-        const txCount = 3;
-        for (let ord = 1; ord <= txCount; ord++) {
+        const assignment = classAssignments.find(a => a.subject_id === subj.subject_id);
+        const teacherId = assignment ? assignment.teacher_id : adminUser.user_id;
+
+        // TX: 3 điểm
+        for (let ord = 1; ord <= 3; ord++) {
           await prisma.score.create({
             data: {
               student_id: hs.student.student_id,
               subject_id: subj.subject_id,
+              year_id: year.year_id,
               semester: sem,
               score_type: 'TX',
               score_value: rndScore(),
               order_no: ord,
-              created_by: teachers.find(t => t.subjectId === subj.subject_id)?.user.user_id || adminUser.user_id,
+              created_by: teacherId,
             },
           });
           scoreCount++;
@@ -302,11 +437,12 @@ async function main() {
           data: {
             student_id: hs.student.student_id,
             subject_id: subj.subject_id,
+            year_id: year.year_id,
             semester: sem,
             score_type: 'GK',
             score_value: rndScore(),
             order_no: null,
-            created_by: teachers.find(t => t.subjectId === subj.subject_id)?.user.user_id || adminUser.user_id,
+            created_by: teacherId,
           },
         });
         scoreCount++;
@@ -316,11 +452,12 @@ async function main() {
           data: {
             student_id: hs.student.student_id,
             subject_id: subj.subject_id,
+            year_id: year.year_id,
             semester: sem,
             score_type: 'CK',
             score_value: rndScore(),
             order_no: null,
-            created_by: teachers.find(t => t.subjectId === subj.subject_id)?.user.user_id || adminUser.user_id,
+            created_by: teacherId,
           },
         });
         scoreCount++;
@@ -339,7 +476,6 @@ async function main() {
     },
   });
 
-  // Gửi cho tất cả học sinh
   await prisma.notificationReceiver.createMany({
     data: allStudents.map(s => ({ notification_id: notif1.notification_id, user_id: s.user.user_id, is_read: false })),
   });
@@ -351,30 +487,66 @@ async function main() {
       created_by: adminUser.user_id,
     },
   });
+  
   await prisma.notificationReceiver.createMany({
     data: parents.map(p => ({ notification_id: notif2.notification_id, user_id: p.user.user_id, is_read: false })),
   });
-
   console.log('✅ 2 Thông báo tạo xong');
 
   // ── 14. Nhận xét học sinh ─────────────────────────────────────────────────
-  // GVCN 10A (teacher Toán) nhận xét 3 học sinh lớp 10A kỳ 1
-  const gvcn10A = teachers[GVCN_TEACHER_INDICES[0]];
-  for (let i = 0; i < 3; i++) {
-    const hs = allStudents[i];
-    await prisma.comment.create({
-      data: {
-        student_id: hs.student.student_id,
-        teacher_id: gvcn10A.user.user_id,
-        semester: 1,
-        content: `Em ${hs.user.full_name} có thái độ học tập ${i === 0 ? 'rất tích cực, cần tiếp tục phát huy' : i === 1 ? 'tốt, tuy nhiên cần chú ý hơn môn Tiếng Anh' : 'cần cải thiện, đặc biệt là sự chăm chú trong giờ học'}.`,
-      },
+  console.log('🌱 Đang tạo nhận xét học sinh...');
+  for (let ciIdx = 0; ciIdx < classInstances.length; ciIdx++) {
+    const ci = classInstances[ciIdx];
+    const classStudents = allStudents.filter(s => s.classInstanceId === ci.instance.class_instance_id);
+    
+    const instanceWithGvcn = await prisma.classInstance.findUnique({
+      where: { class_instance_id: ci.instance.class_instance_id },
+      select: { homeroom_teacher_id: true }
     });
+    
+    if (instanceWithGvcn && instanceWithGvcn.homeroom_teacher_id) {
+      for (let i = 0; i < Math.min(3, classStudents.length); i++) {
+        const hs = classStudents[i];
+        await prisma.comment.create({
+          data: {
+            student_id: hs.student.student_id,
+            teacher_id: instanceWithGvcn.homeroom_teacher_id,
+            semester: 1,
+            content: `Em ${hs.user.full_name} có thái độ học tập ${i === 0 ? 'rất tích cực, cần tiếp tục phát huy' : i === 1 ? 'tốt, tuy học lực cần cố gắng nhiều hơn' : 'cần cải thiện, đặc biệt là sự tập trung nghe giảng trong giờ học'}.`,
+          },
+        });
+      }
+    }
   }
   console.log('✅ Nhận xét học sinh tạo xong');
 
+  // ── 14b. Đánh giá Hạnh kiểm học sinh ──────────────────────────────────────
+  console.log('🌱 Đang tạo hạnh kiểm học sinh...');
+  const ratings = ['EXCELLENT', 'GOOD', 'AVERAGE'];
+  for (const hs of allStudents) {
+    const ci = await prisma.classInstance.findUnique({
+      where: { class_instance_id: hs.classInstanceId },
+      select: { homeroom_teacher_id: true }
+    });
+    if (ci && ci.homeroom_teacher_id) {
+      for (const sem of [1, 2]) {
+        await prisma.conduct.create({
+          data: {
+            student_id: hs.student.student_id,
+            semester: sem,
+            year_id: year.year_id,
+            rating: ratings[Math.floor(Math.random() * ratings.length)],
+            note: 'Đánh giá hạnh kiểm định kỳ',
+            teacher_id: ci.homeroom_teacher_id,
+          }
+        });
+      }
+    }
+  }
+  console.log('✅ Hạnh kiểm học sinh tạo xong');
+
   // ── 15. Thành tích ────────────────────────────────────────────────────────
-  // HS 1 gửi thành tích (PENDING)
+  const gvcn10A = teachers[gvcnIndicesMap[0]];
   await prisma.achievement.create({
     data: {
       student_id: allStudents[0].student.student_id,
@@ -385,7 +557,6 @@ async function main() {
     },
   });
 
-  // HS 2 gửi thành tích (APPROVED)
   const ach2 = await prisma.achievement.create({
     data: {
       student_id: allStudents[1].student.student_id,
@@ -407,6 +578,50 @@ async function main() {
   });
   console.log('✅ Thành tích học sinh tạo xong');
 
+  // ── 16. Thời khóa biểu (Schedules) ─────────────────────────────────────────
+  console.log('📅 Seeding thời khoá biểu cho 9 lớp...\n');
+  const PERIODS_PER_DAY = [1, 2, 3, 4, 5, 6];
+  const DAYS = [2, 3, 4, 5, 6]; // T2→T6
+  const ROOMS = ['A101', 'A102', 'A103', 'B201', 'B202', 'B203', 'C301', 'C302', 'C303'];
+  let totalCreatedSchedules = 0;
+
+  for (let ciIdx = 0; ciIdx < classInstances.length; ciIdx++) {
+    const ci = classInstances[ciIdx];
+    const label = `${ci.grade}${ci.code}`;
+    const assignments = await prisma.teacherAssignment.findMany({
+      where: { class_instance_id: ci.instance.class_instance_id }
+    });
+
+    if (assignments.length === 0) {
+      console.log(`  ⚠️  Lớp ${label}: không có GV phân công, bỏ qua`);
+      continue;
+    }
+
+    const room = ROOMS[ciIdx % ROOMS.length];
+    let assignmentIdx = 0;
+    const scheduleEntries = [];
+
+    for (const day of DAYS) {
+      for (const period of PERIODS_PER_DAY) {
+        const assignment = assignments[assignmentIdx % assignments.length];
+        assignmentIdx++;
+        scheduleEntries.push({
+          class_instance_id: ci.instance.class_instance_id,
+          day_of_week: day,
+          period,
+          subject_id: assignment.subject_id,
+          teacher_id: assignment.teacher_id,
+          room,
+        });
+      }
+    }
+
+    await prisma.schedule.createMany({ data: scheduleEntries, skipDuplicates: true });
+    totalCreatedSchedules += scheduleEntries.length;
+    console.log(`  Sub-step: Lớp ${label} -> ${scheduleEntries.length} tiết`);
+  }
+  console.log(`\n🎉 Hoàn thành thời khoá biểu! Tổng ${totalCreatedSchedules} tiết học được tạo.`);
+
   // ── Tổng kết tài khoản demo ───────────────────────────────────────────────
   console.log('\n' + '═'.repeat(60));
   console.log('🎉 SEED HOÀN THÀNH!\n');
@@ -416,17 +631,17 @@ async function main() {
   console.log('  ─'.repeat(30));
   console.log(`  Admin           | admin             | Admin@123`);
   console.log(`  GV Chủ nhiệm   | gv_chunhiem       | Teacher@123  ← GVCN lớp 10A`);
-  console.log(`  GV Không GVCN  | gv_nochunhiem     | Teacher@123  ← GV Sử, không CN`);
-  console.log(`  Học sinh 1      | hocsinh1          | Student@123  ← ${allStudents[0].user.full_name}`);
-  console.log(`  Học sinh 2      | hocsinh2          | Student@123  ← ${allStudents[1].user.full_name}`);
-  console.log(`  Phụ huynh      | phuhuynh1         | Parent@123   ← PH của ${allStudents[4].user.full_name}`);
+  console.log(`  Tổ trưởng Sử   | gv_su             | Teacher@123  ← Tổ trưởng Sử (không GVCN)`);
+  console.log(`  GV bộ môn      | gv_bomon          | Teacher@123  ← GV bộ môn Toán (Thường) – Lê Hữu Hải`);
+  console.log(`  Học sinh 1     | hocsinh1          | Student@123  ← ${allStudents[0].user.full_name}`);
+  console.log(`  Phụ huynh      | phuhuynh1         | Parent@123   ← PH của Lê Quốc Cường`);
   console.log('═'.repeat(60));
   console.log(`\n📊 THỐNG KÊ:`);
-  console.log(`  – Học sinh: 60 (10/lớp × 6 lớp)`);
-  console.log(`  – Phụ huynh: 6`);
-  console.log(`  – Giáo viên: 8 (6 GVCN, 2 không GVCN)`);
-  console.log(`  – Bản ghi điểm: ${scoreCount} (60 HS × 8 môn × 2 kỳ × 5 cột)`);
-  console.log(`  – Lớp học: 6 (10A, 10B, 11A, 11B, 12A, 12B)`);
+  console.log(`  – Học sinh: 90 (10/lớp × 9 lớp)`);
+  console.log(`  – Phụ huynh: 9`);
+  console.log(`  – Giáo viên: 32 (9 GVCN, 23 bộ môn)`);
+  console.log(`  – Bản ghi điểm: ${scoreCount} (90 HS × 8 môn × 2 kỳ × 5 cột)`);
+  console.log(`  – Lớp học: 9 (10A/B/C, 11A/B/C, 12A/B/C)`);
   console.log(`  – Năm học: 2024-2025`);
 }
 

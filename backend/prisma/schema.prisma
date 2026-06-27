@@ -33,6 +33,7 @@ model User {
   homeroom_instances     ClassInstance[]         @relation("HomeroomTeacher")
   teacher_assignments    TeacherAssignment[]
   scores_created         Score[]                 @relation("ScoreCreatedBy")
+  score_histories        ScoreHistory[]          @relation("ScoreHistoryChanger")
   comments_given         Comment[]               @relation("TeacherComment")
   notifications_created  Notification[]
   notification_receivers NotificationReceiver[]
@@ -40,6 +41,8 @@ model User {
   achievement_comments   AchievementComment[]
   schedules              Schedule[]              @relation("ScheduleTeacher")
   conducts_given         Conduct[]               @relation("ConductTeacher")
+  headed_department      Department?             @relation("DepartmentHead")
+  department_memberships DepartmentMember[]      @relation("DepartmentMember")
 
   @@map("users")
 }
@@ -50,13 +53,16 @@ enum UserStatus {
 }
 
 model AcademicYear {
-  year_id    Int      @id @default(autoincrement())
-  name       String   @db.VarChar(20)
-  start_date DateTime @db.Date
-  end_date   DateTime @db.Date
+  year_id        Int      @id @default(autoincrement())
+  name           String   @db.VarChar(20)
+  start_date     DateTime @db.Date
+  end_date       DateTime @db.Date
+  is_locked_sem1 Boolean  @default(false)
+  is_locked_sem2 Boolean  @default(false)
 
   class_instances ClassInstance[]
   conducts        Conduct[]
+  scores          Score[]
 
   @@map("academic_years")
 }
@@ -137,6 +143,7 @@ model Subject {
   teacher_assignments TeacherAssignment[]
   scores              Score[]
   schedules           Schedule[]
+  department          Department?
 
   @@map("subjects")
 }
@@ -158,6 +165,7 @@ model Score {
   score_id    Int       @id @default(autoincrement())
   student_id  Int
   subject_id  Int
+  year_id     Int?
   semester    Int
   score_type  ScoreType
   score_value Float
@@ -165,11 +173,27 @@ model Score {
   created_by  Int?
   updated_at  DateTime  @updatedAt
 
-  student    Student @relation(fields: [student_id], references: [student_id])
-  subject    Subject @relation(fields: [subject_id], references: [subject_id])
-  created_by_user User? @relation("ScoreCreatedBy", fields: [created_by], references: [user_id])
+  student         Student        @relation(fields: [student_id], references: [student_id])
+  subject         Subject        @relation(fields: [subject_id], references: [subject_id])
+  year            AcademicYear?  @relation(fields: [year_id], references: [year_id])
+  created_by_user User?          @relation("ScoreCreatedBy", fields: [created_by], references: [user_id])
+  histories       ScoreHistory[]
 
   @@map("scores")
+}
+
+model ScoreHistory {
+  history_id Int      @id @default(autoincrement())
+  score_id   Int
+  changed_by Int
+  old_value  Float?
+  new_value  Float
+  changed_at DateTime @default(now())
+
+  score   Score @relation(fields: [score_id], references: [score_id], onDelete: Cascade)
+  changer User  @relation("ScoreHistoryChanger", fields: [changed_by], references: [user_id])
+
+  @@map("score_histories")
 }
 
 enum ScoreType {
@@ -308,4 +332,28 @@ model Schedule {
 
   @@unique([class_instance_id, day_of_week, period])
   @@map("schedules")
+}
+
+model Department {
+  department_id   Int                 @id @default(autoincrement())
+  department_name String              @db.VarChar(100)
+  subject_id      Int                 @unique
+  head_teacher_id Int?                @unique
+  
+  subject         Subject             @relation(fields: [subject_id], references: [subject_id])
+  head_teacher    User?               @relation("DepartmentHead", fields: [head_teacher_id], references: [user_id])
+  members         DepartmentMember[]
+
+  @@map("departments")
+}
+
+model DepartmentMember {
+  department_id   Int
+  teacher_id      Int
+
+  department      Department          @relation(fields: [department_id], references: [department_id], onDelete: Cascade)
+  teacher         User                @relation("DepartmentMember", fields: [teacher_id], references: [user_id], onDelete: Cascade)
+
+  @@id([department_id, teacher_id])
+  @@map("department_members")
 }

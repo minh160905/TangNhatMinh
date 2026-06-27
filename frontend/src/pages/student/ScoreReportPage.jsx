@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Select, Typography, Tag, Spin, Alert, Card, Statistic, Row, Col } from 'antd';
+import { Table, Select, Button, Typography, Tag, Spin, Alert, Card, Statistic, Row, Col } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { studentApi } from '../../api';
 
@@ -40,6 +40,48 @@ export default function ScoreReportPage() {
     queryKey: ['student-report', semester],
     queryFn: () => studentApi.getReport({ semester }).then(r => r.data.data),
   });
+
+  const handleExportCSV = () => {
+    if (!report || !report.subjects || report.subjects.length === 0) return;
+    const headers = ['Môn học', 'TX1', 'TX2', 'TX3', 'TX4', 'TX5', 'TB-TX', 'GK', 'CK', 'ĐTB Môn'];
+    const rows = report.subjects.map(s => [
+      s.subject_name || '',
+      s.tx1 ?? '',
+      s.tx2 ?? '',
+      s.tx3 ?? '',
+      s.tx4 ?? '',
+      s.tx5 ?? '',
+      s.tx_avg ?? '',
+      s.gk ?? '',
+      s.ck ?? '',
+      s.dtb ?? ''
+    ]);
+    rows.push([
+      'ĐTB TỔNG KẾT HỌC KỲ',
+      '', '', '', '', '', '', '', '',
+      report.overall_avg ?? ''
+    ]);
+    rows.push([
+      'XẾP LOẠI HỌC LỰC',
+      '', '', '', '', '', '', '', '',
+      report.academic_classification ?? ''
+    ]);
+    rows.push([
+      'XẾP LOẠI HẠNH KIỂM',
+      '', '', '', '', '', '', '', '',
+      report.conduct_classification ?? ''
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.map(val => `"${val}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Bang_Diem_${report.student.full_name}_HK${semester}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const columns = [
     {
@@ -90,6 +132,8 @@ export default function ScoreReportPage() {
             { label: 'Mã học sinh', value: report.student.student_code, color: '#60A5FA' },
             { label: 'Lớp', value: report.student.class, color: '#A78BFA' },
             { label: 'Năm học', value: report.student.year, color: '#34D399' },
+            { label: 'Học lực học kỳ', value: report.academic_classification, color: '#F59E0B' },
+            { label: 'Hạnh kiểm học kỳ', value: report.conduct_classification, color: '#EC4899' },
           ].map(item => (
             <div key={item.label} style={{ background: '#fff', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 16px' }}>
               <div style={{ color: '#6B7280', fontSize: 11, marginBottom: 4 }}>{item.label}</div>
@@ -100,15 +144,24 @@ export default function ScoreReportPage() {
       )}
 
       {/* Semester select */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <Select value={semester} onChange={setSemester} style={{ width: 160 }}
           options={[{ value: 1, label: 'Học kỳ I' }, { value: 2, label: 'Học kỳ II' }]} />
+
+        {report?.subjects?.length > 0 && (
+          <Button
+            onClick={handleExportCSV}
+            style={{ borderRadius: 8, borderColor: '#10B981', color: '#10B981', fontWeight: 600 }}
+          >
+            📥 Tải bảng điểm (CSV)
+          </Button>
+        )}
 
         {report?.overall_avg !== null && report?.overall_avg !== undefined && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             background: 'rgba(79,70,229,0.15)', border: '1px solid rgba(79,70,229,0.3)',
-            borderRadius: 10, padding: '8px 16px',
+            borderRadius: 10, padding: '8px 16px', marginLeft: 'auto'
           }}>
             <Text style={{ color: '#94A3B8' }}>ĐTB tổng kết:</Text>
             <DTBCell value={report.overall_avg} />

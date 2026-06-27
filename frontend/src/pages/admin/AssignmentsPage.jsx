@@ -8,7 +8,8 @@ import {
   WarningOutlined, CheckCircleOutlined, UserOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { assignmentsApi, classesApi, subjectsApi, usersApi } from '../../api';
+import { assignmentsApi, classesApi, subjectsApi, usersApi, departmentsApi } from '../../api';
+import { useAuthStore } from '../../store/auth.store';
 import { App } from 'antd';
 
 const { Text, Title } = Typography;
@@ -21,6 +22,11 @@ export default function AssignmentsPage() {
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
 
+  const { user } = useAuthStore();
+  const role = user?.role;
+  const isPrincipal = role === 'PRINCIPAL';
+  const isHead = role === 'HEAD_OF_DEPARTMENT';
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [newA, setNewA] = useState({ teacher_id: null, class_instance_id: null, subject_id: null });
   const [filters, setFilters] = useState({ class_instance_id: null, teacher_id: null, subject_id: null });
@@ -28,6 +34,20 @@ export default function AssignmentsPage() {
   const [matrixYear, setMatrixYear] = useState(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
+  const { data: myDept } = useQuery({
+    queryKey: ['my-department'],
+    queryFn: () => departmentsApi.getMyDepartment().then(r => r.data.data),
+    enabled: isHead,
+  });
+
+  // Pre-select subject for Head of Department
+  React.useEffect(() => {
+    if (isHead && myDept?.subject_id) {
+      setNewA(prev => ({ ...prev, subject_id: myDept.subject_id }));
+      setFilters(prev => ({ ...prev, subject_id: myDept.subject_id }));
+    }
+  }, [isHead, myDept]);
+
   const { data: assignments = [], isLoading } = useQuery({
     queryKey: ['assignments', filters],
     queryFn: () => assignmentsApi.getAll(Object.fromEntries(Object.entries(filters).filter(([, v]) => v))).then(r => r.data.data),
@@ -36,8 +56,8 @@ export default function AssignmentsPage() {
   const { data: instances = [] } = useQuery({ queryKey: ['instances'], queryFn: () => classesApi.getInstances().then(r => r.data.data) });
   const { data: subjects = [] } = useQuery({ queryKey: ['subjects'], queryFn: () => subjectsApi.getAll().then(r => r.data.data) });
   const { data: teachers = [] } = useQuery({
-    queryKey: ['users', { role: 'TEACHER' }],
-    queryFn: () => usersApi.getAll({ role: 'TEACHER' }).then(r => r.data.data),
+    queryKey: ['users', { role: ['TEACHER', 'HEAD_OF_DEPARTMENT', 'PRINCIPAL'] }],
+    queryFn: () => usersApi.getAll({ role: ['TEACHER', 'HEAD_OF_DEPARTMENT', 'PRINCIPAL'] }).then(r => r.data.data),
   });
   const { data: years = [] } = useQuery({ queryKey: ['years'], queryFn: () => classesApi.getYears().then(r => r.data.data) });
 
@@ -146,6 +166,31 @@ export default function AssignmentsPage() {
     },
   ];
 
+  const candidateTeachers = isHead && myDept
+    ? myDept.members.map(m => m.teacher)
+    : teachers;
+
+  const subjectOptions = isHead && myDept
+    ? [myDept.subject].filter(Boolean)
+    : subjects;
+
+  const selectedTeacher = newA.teacher_id ? candidateTeachers.find(t => t.user_id === newA.teacher_id) : null;
+  const teacherSubjects = isHead && myDept
+    ? subjectOptions
+    : selectedTeacher?.teacher_assignments && selectedTeacher.teacher_assignments.length > 0
+      ? Array.from(
+          new Map(
+            selectedTeacher.teacher_assignments
+              .filter(ta => ta.subject)
+              .map(ta => [ta.subject.subject_id, ta.subject])
+          ).values()
+        )
+      : subjects;
+
+  const activeColumns = isPrincipal
+    ? columns.filter(c => c.title !== 'Thao tác')
+    : columns;
+
   return (
     <div>
       <div className="page-header">
@@ -154,42 +199,45 @@ export default function AssignmentsPage() {
       </div>
 
       {/* ── Form phân công nhanh ─────────────────────────────────────────── */}
-      <div style={{
-        background: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-        borderRadius: 14, padding: '18px 20px', marginBottom: 20,
-      }}>
-        <Text strong style={{ color: '#4F46E5', marginBottom: 12, display: 'block', fontSize: 14 }}>
-          ➕ Phân công nhanh
-        </Text>
-        <Space wrap>
-          <Select
-            placeholder="Chọn giáo viên" style={{ width: 230 }} value={newA.teacher_id}
-            onChange={v => setNewA(p => ({ ...p, teacher_id: v }))}
-            options={teachers.map(t => ({ value: t.user_id, label: t.full_name }))}
-            showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
-          />
-          <Select
-            placeholder="Chọn lớp" style={{ width: 210 }} value={newA.class_instance_id}
-            onChange={v => setNewA(p => ({ ...p, class_instance_id: v }))}
-            options={instances.map(i => ({ value: i.class_instance_id, label: `${i.grade}${i.class?.class_code} – ${i.year?.name}` }))}
-            showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
-          />
-          <Select
-            placeholder="Chọn môn học" style={{ width: 180 }} value={newA.subject_id}
-            onChange={v => setNewA(p => ({ ...p, subject_id: v }))}
-            options={subjects.map(s => ({ value: s.subject_id, label: s.subject_name }))}
-            showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
-          />
-          <Button
-            type="primary" icon={<PlusOutlined />} loading={createMut.isPending}
-            disabled={!newA.teacher_id || !newA.class_instance_id || !newA.subject_id}
-            onClick={() => createMut.mutate(newA)}
-            style={{ minWidth: 110 }}
-          >
-            Phân công
-          </Button>
-        </Space>
-      </div>
+      {!isPrincipal && (
+        <div style={{
+          background: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          borderRadius: 14, padding: '18px 20px', marginBottom: 20,
+        }}>
+          <Text strong style={{ color: '#4F46E5', marginBottom: 12, display: 'block', fontSize: 14 }}>
+            ➕ Phân công nhanh
+          </Text>
+          <Space wrap>
+            <Select
+              placeholder="Chọn giáo viên" style={{ width: 230 }} value={newA.teacher_id}
+              onChange={v => setNewA(p => ({ ...p, teacher_id: v, subject_id: isHead && myDept ? myDept.subject_id : null }))}
+              options={candidateTeachers.map(t => ({ value: t.user_id, label: t.full_name }))}
+              showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
+            />
+            <Select
+              placeholder="Chọn lớp" style={{ width: 210 }} value={newA.class_instance_id}
+              onChange={v => setNewA(p => ({ ...p, class_instance_id: v }))}
+              options={instances.map(i => ({ value: i.class_instance_id, label: `${i.grade}${i.class?.class_code} – ${i.year?.name}` }))}
+              showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
+            />
+            <Select
+              placeholder="Chọn môn học" style={{ width: 180 }} value={newA.subject_id}
+              onChange={v => setNewA(p => ({ ...p, subject_id: v }))}
+              disabled={isHead}
+              options={teacherSubjects.map(s => ({ value: s.subject_id, label: s.subject_name }))}
+              showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
+            />
+            <Button
+              type="primary" icon={<PlusOutlined />} loading={createMut.isPending}
+              disabled={!newA.teacher_id || !newA.class_instance_id || !newA.subject_id}
+              onClick={() => createMut.mutate(newA)}
+              style={{ minWidth: 110 }}
+            >
+              Phân công
+            </Button>
+          </Space>
+        </div>
+      )}
 
       {/* ── Stats bar ────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
@@ -225,7 +273,7 @@ export default function AssignmentsPage() {
                 <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
                   <Select placeholder="Lọc giáo viên" allowClear style={{ width: 200 }}
                     onChange={v => setFilters(f => ({ ...f, teacher_id: v || null }))}
-                    options={teachers.map(t => ({ value: t.user_id, label: t.full_name }))}
+                    options={candidateTeachers.map(t => ({ value: t.user_id, label: t.full_name }))}
                     showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
                   />
                   <Select placeholder="Lọc lớp" allowClear style={{ width: 200 }}
@@ -234,10 +282,12 @@ export default function AssignmentsPage() {
                     showSearch filterOption={(i, o) => o.label.toLowerCase().includes(i.toLowerCase())}
                   />
                   <Select placeholder="Lọc môn học" allowClear style={{ width: 180 }}
+                    value={isHead && myDept ? myDept.subject_id : filters.subject_id}
+                    disabled={isHead}
                     onChange={v => setFilters(f => ({ ...f, subject_id: v || null }))}
-                    options={subjects.map(s => ({ value: s.subject_id, label: s.subject_name }))}
+                    options={subjectOptions.map(s => ({ value: s.subject_id, label: s.subject_name }))}
                   />
-                  {selectedRowKeys.length > 0 && (
+                  {!isPrincipal && selectedRowKeys.length > 0 && (
                     <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}
                       loading={batchDeleteMut.isPending}>
                       Xóa {selectedRowKeys.length} đã chọn
@@ -246,8 +296,8 @@ export default function AssignmentsPage() {
                 </div>
 
                 <Table
-                  dataSource={assignments} columns={columns} rowKey="assignment_id" loading={isLoading}
-                  rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+                  dataSource={assignments} columns={activeColumns} rowKey="assignment_id" loading={isLoading}
+                  rowSelection={isPrincipal ? undefined : { selectedRowKeys, onChange: setSelectedRowKeys }}
                   pagination={{ pageSize: 15, showTotal: t => `${t} phân công` }}
                   size="middle"
                 />
@@ -313,10 +363,12 @@ export default function AssignmentsPage() {
                                     {cell ? (
                                       <div style={{ textAlign: 'center' }}>
                                         <div style={{ color: '#10B981', fontWeight: 600, fontSize: 12 }}>{cell.teacher_name}</div>
-                                        <Popconfirm title="Xóa phân công này?" okText="Xóa" cancelText="Hủy"
-                                          onConfirm={() => deleteMut.mutate(cell.assignment_id)}>
-                                          <Button type="text" size="small" danger style={{ fontSize: 10, padding: '0 4px', height: 18 }}>✕</Button>
-                                        </Popconfirm>
+                                        {!isPrincipal && (
+                                          <Popconfirm title="Xóa phân công này?" okText="Xóa" cancelText="Hủy"
+                                            onConfirm={() => deleteMut.mutate(cell.assignment_id)}>
+                                            <Button type="text" size="small" danger style={{ fontSize: 10, padding: '0 4px', height: 18 }}>✕</Button>
+                                          </Popconfirm>
+                                        )}
                                       </div>
                                     ) : (
                                       <Tooltip title={`Chưa phân công ${sub.subject_name} cho lớp ${cls.label}`}>

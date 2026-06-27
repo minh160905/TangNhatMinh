@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Select, Button, Input, Typography, Tag, Tabs, Spin, Empty } from 'antd';
 import { SendOutlined, CommentOutlined, StarOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -201,12 +201,14 @@ function ConductTab({ classInstanceId, semester }) {
   }
 
   // Check if teacher is homeroom of this class
-  if (homeroomClass && homeroomClass.class_instance_id !== classInstanceId) {
+  if (!homeroomClass || homeroomClass.class_instance_id !== classInstanceId) {
     return (
       <div style={{ textAlign: 'center', padding: 60, color: '#EF4444' }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>🔒</div>
         <div style={{ fontWeight: 600 }}>Chỉ GVCN mới có thể đánh giá hạnh kiểm</div>
-        <div style={{ color: '#9CA3AF', fontSize: 13, marginTop: 4 }}>Vui lòng chọn lớp bạn chủ nhiệm</div>
+        <div style={{ color: '#9CA3AF', fontSize: 13, marginTop: 4 }}>
+          {homeroomClass ? 'Vui lòng chọn lớp bạn chủ nhiệm' : 'Bạn hiện không chủ nhiệm lớp nào trong hệ thống'}
+        </div>
       </div>
     );
   }
@@ -358,6 +360,13 @@ export default function CommentsPage() {
   const isHomeroomTab = activeTab === 'conduct';
   const isHomeroomClass = homeroomClass && classInstanceId === homeroomClass.class_instance_id;
 
+  // Auto-select homeroom class when switching to conduct tab
+  useEffect(() => {
+    if (isHomeroomTab && homeroomClass && classInstanceId !== homeroomClass.class_instance_id) {
+      setClassInstanceId(homeroomClass.class_instance_id);
+    }
+  }, [isHomeroomTab, homeroomClass, classInstanceId]);
+
   return (
     <div>
       <div className="page-header">
@@ -371,7 +380,7 @@ export default function CommentsPage() {
           placeholder="🏫 Chọn lớp" style={{ width: 220 }}
           value={classInstanceId}
           onChange={v => setClassInstanceId(v)}
-          options={myClasses.map(c => ({
+          options={(isHomeroomTab ? (homeroomClass ? [homeroomClass] : []) : myClasses).map(c => ({
             value: c.class_instance_id,
             label: `Lớp ${c.grade}${c.class?.class_code} – ${c.year?.name}`,
           }))}
@@ -407,18 +416,18 @@ export default function CommentsPage() {
             ),
             children: <CommentsTab classInstanceId={classInstanceId} semester={semester} />,
           },
-          {
-            key: 'conduct',
-            label: (
-              <span style={{ fontWeight: 600 }}>
-                <StarOutlined style={{ marginRight: 6 }} />Hạnh kiểm
-                {homeroomClass && (
+          ...(homeroomClass ? [
+            {
+              key: 'conduct',
+              label: (
+                <span style={{ fontWeight: 600 }}>
+                  <StarOutlined style={{ marginRight: 6 }} />Hạnh kiểm
                   <Tag color="gold" style={{ marginLeft: 6, fontSize: 10, borderRadius: 10 }}>GVCN</Tag>
-                )}
-              </span>
-            ),
-            children: <ConductTab classInstanceId={classInstanceId} semester={semester} />,
-          },
+                </span>
+              ),
+              children: <ConductTab classInstanceId={classInstanceId} semester={semester} />,
+            }
+          ] : []),
         ]}
       />
     </div>

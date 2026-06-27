@@ -14,15 +14,15 @@ router.get('/', async (req, res, next) => {
   try { success(res, await svc.getForUser(req.user.userId)); } catch (e) { next(e); }
 });
 
-router.get('/sent', authorize('TEACHER'), async (req, res, next) => {
+router.get('/sent', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try { success(res, await svc.getSentNotifications(req.user.userId)); } catch (e) { next(e); }
 });
 
-router.get('/recipients', authorize('TEACHER'), async (req, res, next) => {
+router.get('/recipients', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try { success(res, await svc.getRecipients(req.user.userId)); } catch (e) { next(e); }
 });
 
-router.post('/', authorize('TEACHER'), async (req, res, next) => {
+router.post('/', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try { created(res, await svc.create(req.body, req.user.userId)); } catch (e) { next(e); }
 });
 

@@ -16,11 +16,20 @@ import dayjs from 'dayjs';
 const { Text } = Typography;
 
 const ROLE_CONFIG = {
-  ADMIN:   { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',   label: 'Quản trị viên' },
-  TEACHER: { color: '#4F46E5', bg: 'rgba(129,140,248,0.1)', label: 'Giáo viên'     },
-  STUDENT: { color: '#10B981', bg: 'rgba(16,185,129,0.1)',  label: 'Học sinh'      },
-  PARENT:  { color: '#60A5FA', bg: 'rgba(96,165,250,0.1)',  label: 'Phụ huynh'    },
+  ADMIN:              { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',   label: 'Quản trị viên'        },
+  TEACHER:            { color: '#4F46E5', bg: 'rgba(129,140,248,0.1)', label: 'Giáo viên'            },
+  HEAD_OF_DEPARTMENT: { color: '#0F766E', bg: 'rgba(15,118,110,0.1)',  label: 'Tổ trưởng chuyên môn' },
+  PRINCIPAL:          { color: '#B91C1C', bg: 'rgba(185,28,28,0.1)',   label: 'Hiệu trưởng'          },
+  STUDENT:            { color: '#10B981', bg: 'rgba(16,185,129,0.1)',  label: 'Học sinh'             },
+  PARENT:             { color: '#60A5FA', bg: 'rgba(96,165,250,0.1)',  label: 'Phụ huynh'            },
 };
+
+// Nhóm stat cards hiển thị trên trang
+const STAT_GROUPS = [
+  { key: 'teachers', label: 'Giáo viên & Ban giám hiệu', color: '#4F46E5', bg: 'rgba(129,140,248,0.1)', roles: ['TEACHER', 'HEAD_OF_DEPARTMENT', 'PRINCIPAL'] },
+  { key: 'students', label: 'Học sinh',                  color: '#10B981', bg: 'rgba(16,185,129,0.1)', roles: ['STUDENT'] },
+  { key: 'parents',  label: 'Phụ huynh',                 color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', roles: ['PARENT'] },
+];
 
 const InfoRow = ({ icon, label, value }) => (
   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: '1px solid #F3F4F6' }}>
@@ -62,6 +71,12 @@ export default function UsersPage() {
     queryFn: () => usersApi.getRoles().then(r => r.data.data),
   });
 
+  const watchedRoleId = Form.useWatch('role_id', form);
+  const editRole = editUser?.role?.role_name;
+  const activeRoleName = editUser
+    ? editRole
+    : (watchedRoleId ? (rolesRes || []).find(r => r.role_id === watchedRoleId)?.role_name : null);
+
   // View drawer - fetch full detail
   const { data: detailUser, isLoading: detailLoading } = useQuery({
     queryKey: ['user-detail', detailUserId],
@@ -80,7 +95,14 @@ export default function UsersPage() {
   const { data: instances = [] } = useQuery({
     queryKey: ['instances'],
     queryFn: () => classesApi.getInstances().then(r => r.data.data),
-    enabled: modalOpen && editUser?.role?.role_name === 'STUDENT',
+    enabled: modalOpen && activeRoleName === 'STUDENT',
+  });
+
+  // Fetch all students for parent-student linking
+  const { data: allStudentsRes = [] } = useQuery({
+    queryKey: ['students-all'],
+    queryFn: () => usersApi.getAll({ role: 'STUDENT' }).then(r => r.data.data),
+    enabled: modalOpen && activeRoleName === 'PARENT',
   });
 
   // When editDetailData loads, populate form with extended fields
@@ -101,6 +123,13 @@ export default function UsersPage() {
           gender: s.gender,
           hometown: s.hometown,
           class_instance_id: s.class_instance?.class_instance_id || null,
+        });
+      }
+      if (role === 'PARENT' && editDetailData.parent) {
+        const p = editDetailData.parent;
+        const studentIds = p.students?.map(s => s.student?.student_id).filter(Boolean) || [];
+        Object.assign(base, {
+          student_ids: studentIds,
         });
       }
       form.setFieldsValue(base);
@@ -150,17 +179,17 @@ export default function UsersPage() {
   };
 
   const handleSubmit = (values) => {
+    const payload = { ...values };
+    if (payload.date_of_birth && payload.date_of_birth?.toISOString) {
+      payload.date_of_birth = payload.date_of_birth.toISOString();
+    }
+
     if (editUser) {
-      // Flatten date_of_birth from dayjs → ISO string
-      const payload = { ...values };
-      if (payload.date_of_birth && payload.date_of_birth?.toISOString) {
-        payload.date_of_birth = payload.date_of_birth.toISOString();
-      }
       // Remove empty password
       if (!payload.password) delete payload.password;
       updateMutation.mutate({ id: editUser.user_id, data: payload });
     } else {
-      createMutation.mutate(values);
+      createMutation.mutate(payload);
     }
   };
 
@@ -170,25 +199,25 @@ export default function UsersPage() {
   };
 
   const users = usersRes || [];
-  const roles = rolesRes || [];
+  const roles = (rolesRes || []).filter(r => r.role_name !== 'ADMIN');
   const role = detailUser?.role?.role_name;
   const roleColor = ROLE_CONFIG[role]?.color || '#4F46E5';
-  const editRole = editUser?.role?.role_name;
 
   // ── Render extended info in view Drawer ────────────────────────────────────
   const renderExtendedInfo = () => {
     if (!detailUser) return null;
-    if (role === 'TEACHER') {
+    if (role === 'TEACHER' || role === 'HEAD_OF_DEPARTMENT' || role === 'PRINCIPAL') {
       const subjects = detailUser.teacher_assignments?.map(a => a.subject?.subject_name).filter(Boolean) || [];
+      const roleCfg = ROLE_CONFIG[role] || ROLE_CONFIG.TEACHER;
       return (
         <div style={{ marginTop: 16 }}>
-          <div style={{ color: '#4F46E5', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ color: roleCfg.color, fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <BookOutlined /> Môn học phụ trách ({subjects.length})
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {subjects.length > 0 ? subjects.map((s, i) => (
               <Tag key={i} color="purple" style={{ borderRadius: 8, padding: '4px 12px', fontSize: 13 }}>{s}</Tag>
-            )) : <Text style={{ color: '#6B7280' }}>Chưa được phân công</Text>}
+            )) : <Text style={{ color: '#6B7280' }}>Chưa được phân công môn học</Text>}
           </div>
         </div>
       );
@@ -320,13 +349,13 @@ export default function UsersPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
-          <div key={role} className="stat-card" style={{ background: cfg.bg, borderColor: `${cfg.color}30` }}>
-            <div className="stat-value" style={{ color: cfg.color }}>
-              {users.filter(u => u.role?.role_name === role).length}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        {STAT_GROUPS.map(grp => (
+          <div key={grp.key} className="stat-card" style={{ background: grp.bg, borderColor: `${grp.color}30` }}>
+            <div className="stat-value" style={{ color: grp.color }}>
+              {users.filter(u => grp.roles.includes(u.role?.role_name)).length}
             </div>
-            <div className="stat-label">{cfg.label}</div>
+            <div className="stat-label">{grp.label}</div>
           </div>
         ))}
       </div>
@@ -341,9 +370,15 @@ export default function UsersPage() {
           allowClear
         />
         <Select
-          placeholder="Lọc vai trò" allowClear style={{ width: 160 }}
+          placeholder="Lọc vai trò" allowClear style={{ width: 200 }}
           onChange={v => setFilters(f => ({ ...f, role: v }))}
-          options={Object.entries(ROLE_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))}
+          options={[
+            { value: 'TEACHER',            label: 'Giáo viên' },
+            { value: 'HEAD_OF_DEPARTMENT', label: 'Tổ trưởng chuyên môn' },
+            { value: 'PRINCIPAL',          label: 'Hiệu trưởng' },
+            { value: 'STUDENT',            label: 'Học sinh' },
+            { value: 'PARENT',             label: 'Phụ huynh' },
+          ]}
         />
         <Select
           placeholder="Trạng thái" allowClear style={{ width: 140 }}
@@ -426,7 +461,7 @@ export default function UsersPage() {
           </span>
         }
         footer={null}
-        width={editRole === 'STUDENT' ? 620 : 520}
+        width={['STUDENT', 'PARENT'].includes(activeRoleName) ? 620 : 520}
         destroyOnClose
       >
         {/* Show spinner while loading edit detail */}
@@ -477,14 +512,14 @@ export default function UsersPage() {
             </>
           )}
 
-          {/* ── THÔNG TIN HỌC SINH (chỉ hiện khi edit STUDENT) ── */}
-          {editRole === 'STUDENT' && (
+          {/* ── THÔNG TIN HỌC SINH (hiện khi chọn STUDENT) ── */}
+          {activeRoleName === 'STUDENT' && (
             <>
               <Divider style={{ borderColor: '#E5E7EB', margin: '16px 0 8px' }} />
               <SectionTitle>THÔNG TIN HỌC SINH</SectionTitle>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Form.Item name="student_code" label="Mã học sinh">
-                  <Input placeholder="HS0101" />
+                  <Input placeholder="Tự động tạo khi lưu" disabled />
                 </Form.Item>
                 <Form.Item name="gender" label="Giới tính">
                   <Select placeholder="Chọn giới tính" allowClear
@@ -508,6 +543,30 @@ export default function UsersPage() {
               </div>
               <Form.Item name="hometown" label="Quê quán">
                 <Input placeholder="Hà Nội, Đà Nẵng..." prefix={<EnvironmentOutlined style={{ color: '#4F46E5' }} />} />
+              </Form.Item>
+            </>
+          )}
+
+          {/* ── LIÊN KẾT CON EM (hiện khi chọn PARENT) ── */}
+          {activeRoleName === 'PARENT' && (
+            <>
+              <Divider style={{ borderColor: '#E5E7EB', margin: '16px 0 8px' }} />
+              <SectionTitle>LIÊN KẾT CON EM</SectionTitle>
+              <Form.Item name="student_ids" label="Chọn con em học sinh">
+                <Select
+                  mode="multiple"
+                  placeholder="Tìm kiếm và chọn con em"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  options={allStudentsRes
+                    .filter(s => s.student)
+                    .map(s => ({
+                      value: s.student.student_id,
+                      label: `${s.full_name} (${s.student.student_code || 'Chưa có mã'})`,
+                    }))}
+                  style={{ width: '100%' }}
+                />
               </Form.Item>
             </>
           )}

@@ -34,4 +34,15 @@ const updateScore = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-module.exports = { getClassScores, upsertScore, batchUpsert, updateScore };
+const getStudentScoreHistory = async (req, res, next) => {
+  try {
+    const { studentId, subjectId, semester, yearId } = req.query;
+    if (!studentId || !subjectId || !semester) {
+      return badRequest(res, 'studentId, subjectId, semester are required');
+    }
+    const data = await svc.getStudentScoreHistory({ studentId, subjectId, semester, yearId });
+    return success(res, data);
+  } catch (e) { next(e); }
+};
+
+module.exports = { getClassScores, upsertScore, batchUpsert, updateScore, getStudentScoreHistory };

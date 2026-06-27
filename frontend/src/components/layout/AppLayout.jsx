@@ -9,44 +9,62 @@ import {
   SettingOutlined, RightOutlined, HomeOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/auth.store';
-import { authApi } from '../../api';
+import { authApi, classesApi } from '../../api';
 import NotificationBell from '../common/NotificationBell';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const { Sider, Header, Content } = Layout;
 const { Text } = Typography;
+
+const BASE_TEACHER_MENUS = [
+  { key: '/teacher/scores',        icon: <BarChartOutlined />, label: 'Nhập điểm',        homeroomOnly: false },
+  { key: '/teacher/comments',      icon: <CommentOutlined />,  label: 'Nhận xét học sinh', homeroomOnly: false },
+  { key: '/teacher/notifications', icon: <SendOutlined />,     label: 'Gửi thông báo',    homeroomOnly: false },
+  { key: '/teacher/schedule',      icon: <CalendarOutlined />, label: 'Thời khoá biểu',   homeroomOnly: false },
+  { key: '/teacher/my-class',      icon: <HomeOutlined />,     label: 'Lớp chủ nhiệm',    homeroomOnly: true  },
+  { key: '/teacher/achievements',  icon: <TrophyOutlined />,   label: 'Duyệt thành tích', homeroomOnly: true  },
+];
+
+// Order: homeroom items first if available, then the rest
+const buildTeacherMenu = (isHomeroom) => {
+  const homeroom = BASE_TEACHER_MENUS.filter(m => m.homeroomOnly);
+  const common   = BASE_TEACHER_MENUS.filter(m => !m.homeroomOnly);
+  return isHomeroom ? [...homeroom, ...common] : common;
+};
 
 const MENUS = {
   ADMIN: [
     { key: '/admin/users',       icon: <TeamOutlined />,      label: 'Quản lý người dùng' },
     { key: '/admin/classes',     icon: <BookOutlined />,      label: 'Quản lý lớp học' },
     { key: '/admin/subjects',    icon: <FileTextOutlined />,  label: 'Quản lý môn học' },
-    { key: '/admin/assignments', icon: <SolutionOutlined />,  label: 'Phân công GV' },
     { key: '/admin/schedule',    icon: <CalendarOutlined />,  label: 'Thời khoá biểu' },
   ],
-  TEACHER: [
-    { key: '/teacher/my-class',      icon: <HomeOutlined />,        label: 'Lớp chủ nhiệm' },
-    { key: '/teacher/scores',        icon: <BarChartOutlined />, label: 'Nhập điểm' },
-    { key: '/teacher/achievements',  icon: <TrophyOutlined />,   label: 'Duyệt thành tích' },
-    { key: '/teacher/comments',      icon: <CommentOutlined />,  label: 'Nhận xét học sinh' },
-    { key: '/teacher/notifications', icon: <SendOutlined />,     label: 'Gửi thông báo' },
-    { key: '/teacher/schedule',      icon: <CalendarOutlined />, label: 'Thời khoá biểu' },
+  PRINCIPAL: [
+    { key: '/admin/classes',     icon: <BookOutlined />,      label: 'Quản lý lớp học' },
+    { key: '/principal/departments', icon: <SolutionOutlined />, label: 'Tổ chuyên môn' },
+    { key: '/admin/assignments', icon: <FileTextOutlined />,  label: 'Danh sách phân công' },
   ],
   STUDENT: [
     { key: '/student/report',       icon: <BarChartOutlined />, label: 'Bảng điểm' },
     { key: '/student/achievements', icon: <TrophyOutlined />,   label: 'Thành tích' },
     { key: '/student/schedule',     icon: <CalendarOutlined />, label: 'Thời khoá biểu' },
+    { key: '/student/comments',     icon: <CommentOutlined />,  label: 'Nhận xét' },
   ],
   PARENT: [
-    { key: '/parent/report',   icon: <BarChartOutlined />, label: 'Xem điểm con' },
-    { key: '/parent/schedule', icon: <CalendarOutlined />, label: 'Thời khoá biểu' },
+    { key: '/parent/report',       icon: <BarChartOutlined />, label: 'Xem điểm con' },
+    { key: '/parent/achievements', icon: <TrophyOutlined />,   label: 'Thành tích con' },
+    { key: '/parent/schedule',     icon: <CalendarOutlined />, label: 'Thời khoá biểu' },
+    { key: '/parent/comments',     icon: <CommentOutlined />,  label: 'Nhận xét con' },
   ],
 };
 
 const ROLE_CONFIG = {
-  ADMIN:   { label: 'Quản trị viên', color: '#7C3AED', bg: '#F5F3FF', dot: '#7C3AED' },
-  TEACHER: { label: 'Giáo viên',     color: '#4F46E5', bg: '#EEF2FF', dot: '#4F46E5' },
-  STUDENT: { label: 'Học sinh',      color: '#059669', bg: '#ECFDF5', dot: '#059669' },
-  PARENT:  { label: 'Phụ huynh',     color: '#2563EB', bg: '#EFF6FF', dot: '#2563EB' },
+  ADMIN:              { label: 'Quản trị viên', color: '#7C3AED', bg: '#F5F3FF', dot: '#7C3AED' },
+  TEACHER:            { label: 'Giáo viên',     color: '#4F46E5', bg: '#EEF2FF', dot: '#4F46E5' },
+  STUDENT:            { label: 'Học sinh',      color: '#059669', bg: '#ECFDF5', dot: '#059669' },
+  PARENT:             { label: 'Phụ huynh',     color: '#2563EB', bg: '#EFF6FF', dot: '#2563EB' },
+  PRINCIPAL:          { label: 'Hiệu trưởng',   color: '#B91C1C', bg: '#FEF2F2', dot: '#B91C1C' },
+  HEAD_OF_DEPARTMENT: { label: 'Tổ trưởng chuyên môn', color: '#0F766E', bg: '#F0FDFA', dot: '#0F766E' },
 };
 
 export default function AppLayout() {
@@ -56,9 +74,41 @@ export default function AppLayout() {
   const location = useLocation();
   const role = user?.role;
   const roleCfg = ROLE_CONFIG[role] || ROLE_CONFIG.STUDENT;
+  const qc = useQueryClient();
+
+  // Fetch homeroom class (only for teachers and department heads)
+  // isSuccess distinguishes "still loading" (undefined) from "loaded but no class" (null)
+  const { data: homeroomClass, isSuccess: homeroomLoaded } = useQuery({
+    queryKey: ['my-homeroom-class'],
+    queryFn: () => classesApi.getMyHomeroomClass().then(r => r.data.data),
+    enabled: role === 'TEACHER' || role === 'HEAD_OF_DEPARTMENT' || role === 'PRINCIPAL',
+    retry: false,
+    staleTime: 5 * 60 * 1000, // cache 5 min
+  });
+
+  let menuItems = [];
+  if (role === 'TEACHER') {
+    menuItems = buildTeacherMenu(!homeroomLoaded || !!homeroomClass);
+  } else if (role === 'HEAD_OF_DEPARTMENT') {
+    const teacherMenu = buildTeacherMenu(!homeroomLoaded || !!homeroomClass);
+    menuItems = [
+      ...teacherMenu,
+      { key: '/admin/assignments', icon: <SolutionOutlined />, label: 'Phân công giảng dạy' },
+    ];
+  } else if (role === 'PRINCIPAL') {
+    // Principal gets teacher functions (including homeroom items dynamically if assigned) + management menus
+    const teacherMenu = buildTeacherMenu(!homeroomLoaded || !!homeroomClass);
+    menuItems = [
+      ...MENUS.PRINCIPAL,
+      ...teacherMenu,
+    ];
+  } else {
+    menuItems = MENUS[role] || [];
+  }
 
   const handleLogout = async () => {
     try { await authApi.logout(); } catch {}
+    qc.clear();
     logout();
     navigate('/login');
   };
@@ -126,7 +176,7 @@ export default function AppLayout() {
           <Menu
             mode="inline"
             selectedKeys={[location.pathname]}
-            items={MENUS[role] || []}
+            items={menuItems}
             onClick={({ key }) => navigate(key)}
             style={{ background: 'transparent', border: 'none' }}
           />

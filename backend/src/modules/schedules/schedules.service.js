@@ -2,7 +2,7 @@ const prisma = require('../../config/prisma');
 
 const INCLUDE = {
   subject: { select: { subject_id: true, subject_name: true } },
-  teacher: { select: { user_id: true, full_name: true } },
+  teacher: { select: { user_id: true, full_name: true, email: true, phone: true } },
   class_instance: {
     include: {
       class: { select: { class_code: true } },
@@ -74,6 +74,76 @@ const getByParent = async (userId) => {
 /** Create / upsert một ô TKB */
 const upsert = async (data) => {
   const { class_instance_id, day_of_week, period, subject_id, teacher_id, room } = data;
+
+  // 1. Resolve class instance details and year
+  const classInstance = await prisma.classInstance.findUnique({
+    where: { class_instance_id: Number(class_instance_id) },
+    select: { year_id: true, grade: true, class: { select: { class_code: true } } },
+  });
+  if (!classInstance) throw { statusCode: 404, message: 'Class instance not found' };
+  const year_id = classInstance.year_id;
+
+  // 2. Check Teacher Assignment
+  const assignment = await prisma.teacherAssignment.findFirst({
+    where: {
+      teacher_id: Number(teacher_id),
+      class_instance_id: Number(class_instance_id),
+      subject_id: Number(subject_id),
+    },
+  });
+  if (!assignment) {
+    throw {
+      statusCode: 400,
+      message: 'Giáo viên này chưa được phân công giảng dạy môn học đã chọn cho lớp này',
+    };
+  }
+
+  // 3. Check Teacher Clashes (Double booking)
+  const teacherClash = await prisma.schedule.findFirst({
+    where: {
+      day_of_week: Number(day_of_week),
+      period: Number(period),
+      teacher_id: Number(teacher_id),
+      class_instance: { year_id: Number(year_id) },
+      NOT: {
+        class_instance_id: Number(class_instance_id),
+      },
+    },
+    include: {
+      class_instance: { include: { class: true } },
+    },
+  });
+  if (teacherClash) {
+    throw {
+      statusCode: 400,
+      message: `Giáo viên đã có lịch dạy lớp ${teacherClash.class_instance.grade}${teacherClash.class_instance.class.class_code} vào tiết ${period} thứ ${day_of_week}`,
+    };
+  }
+
+  // 4. Check Room Clashes
+  if (room) {
+    const roomClash = await prisma.schedule.findFirst({
+      where: {
+        day_of_week: Number(day_of_week),
+        period: Number(period),
+        room: room,
+        class_instance: { year_id: Number(year_id) },
+        NOT: {
+          class_instance_id: Number(class_instance_id),
+        },
+      },
+      include: {
+        class_instance: { include: { class: true } },
+      },
+    });
+    if (roomClash) {
+      throw {
+        statusCode: 400,
+        message: `Phòng học ${room} đã được sử dụng bởi lớp ${roomClash.class_instance.grade}${roomClash.class_instance.class.class_code} vào tiết ${period} thứ ${day_of_week}`,
+      };
+    }
+  }
+
   return prisma.schedule.upsert({
     where: { class_instance_id_day_of_week_period: { class_instance_id: Number(class_instance_id), day_of_week: Number(day_of_week), period: Number(period) } },
     create: { class_instance_id: Number(class_instance_id), day_of_week: Number(day_of_week), period: Number(period), subject_id: Number(subject_id), teacher_id: Number(teacher_id), room: room || null },

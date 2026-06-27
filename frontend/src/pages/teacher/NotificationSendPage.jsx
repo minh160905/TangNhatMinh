@@ -26,7 +26,7 @@ const RecipientCard = ({ user, type, sub, selected, onToggle }) => {
       onClick={() => onToggle(user.user_id)}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        background: selected ? (isStudent ? 'rgba(16,185,129,0.08)' : 'rgba(96,165,250,0.08)') : 'rgba(15,14,30,0.5)',
+        background: selected ? (isStudent ? 'rgba(16,185,129,0.08)' : 'rgba(96,165,250,0.08)') : '#F9FAFB',
         border, borderRadius: 10, padding: '10px 14px',
         cursor: 'pointer', transition: 'all 0.15s', userSelect: 'none',
       }}
@@ -194,9 +194,9 @@ export default function NotificationSendPage() {
                   { k: 'individual', l: '👤 Cá nhân', icon: <UserOutlined /> },
                 ].map(m => (
                   <button key={m.k} type="button" onClick={() => { setMode(m.k); setSelectedIds(new Set()); setSelectedClass(null); }} style={{
-                    background: mode === m.k ? 'rgba(79,70,229,0.3)' : 'rgba(15,14,30,0.5)',
+                    background: mode === m.k ? 'rgba(79,70,229,0.1)' : '#F3F4F6',
                     border: `1px solid ${mode === m.k ? '#4F46E5' : '#E5E7EB'}`,
-                    color: mode === m.k ? '#4F46E5' : '#94A3B8',
+                    color: mode === m.k ? '#4F46E5' : '#374151',
                     borderRadius: 8, padding: '7px 18px', cursor: 'pointer', fontWeight: 600, fontSize: 13,
                   }}>{m.l}</button>
                 ))}
@@ -213,9 +213,9 @@ export default function NotificationSendPage() {
                         <button key={c.class_instance_id} type="button"
                           onClick={() => setSelectedClass(sel ? null : c.class_instance_id)}
                           style={{
-                            background: sel ? 'rgba(79,70,229,0.3)' : 'rgba(15,14,30,0.5)',
+                            background: sel ? 'rgba(79,70,229,0.1)' : '#F3F4F6',
                             border: `1px solid ${sel ? '#4F46E5' : '#E5E7EB'}`,
-                            color: sel ? '#4F46E5' : '#94A3B8',
+                            color: sel ? '#4F46E5' : '#374151',
                             borderRadius: 10, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 14,
                             transition: 'all 0.15s',
                           }}
@@ -246,15 +246,15 @@ export default function NotificationSendPage() {
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Tìm kiếm tên, lớp..."
                         style={{
-                          width: '100%', background: 'rgba(15,14,30,0.5)', border: '1px solid rgba(99,102,241,0.2)',
+                          width: '100%', background: '#fff', border: '1px solid #E5E7EB',
                           borderRadius: 8, padding: '7px 12px 7px 32px', color: '#111827', fontSize: 13, boxSizing: 'border-box',
                         }}
                       />
                     </div>
                     <button type="button" onClick={() => toggleAll(allFilteredIds)} style={{
-                      background: allSelected ? 'rgba(79,70,229,0.3)' : 'rgba(15,14,30,0.5)',
+                      background: allSelected ? 'rgba(79,70,229,0.1)' : '#F3F4F6',
                       border: `1px solid ${allSelected ? '#4F46E5' : '#E5E7EB'}`,
-                      color: allSelected ? '#4F46E5' : '#94A3B8',
+                      color: allSelected ? '#4F46E5' : '#374151',
                       borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap',
                     }}>
                       {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
@@ -352,7 +352,7 @@ export default function NotificationSendPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sentNotifs.map(n => (
                 <div key={n.notification_id} style={{
-                  background: 'rgba(15,14,30,0.5)', border: '1px solid rgba(99,102,241,0.15)',
+                  background: '#F9FAFB', border: '1px solid #E5E7EB',
                   borderRadius: 10, padding: '12px 14px',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>

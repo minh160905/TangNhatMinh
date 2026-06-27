@@ -8,15 +8,52 @@ router.use(authenticate);
 
 // GET /conducts?class_instance_id=&semester=&year_id=
 // Returns all conduct records for a class in a semester
-router.get('/', authorize('TEACHER'), async (req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
-    const { class_instance_id, semester, year_id } = req.query;
+    const { class_instance_id, semester, year_id, student_id } = req.query;
     const where = {};
     if (semester) where.semester = Number(semester);
     if (year_id) where.year_id = Number(year_id);
-    if (class_instance_id) {
-      where.student = { class_instance_id: Number(class_instance_id) };
+
+    if (req.user.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({
+        where: { user_id: req.user.userId },
+      });
+      if (student) {
+        where.student_id = student.student_id;
+      } else {
+        where.student_id = -1;
+      }
+    } else if (req.user.role === 'PARENT') {
+      const parent = await prisma.parent.findUnique({
+        where: { user_id: req.user.userId },
+        include: { students: true },
+      });
+      if (parent) {
+        const parentStudentIds = parent.students.map((sp) => sp.student_id);
+        if (student_id) {
+          const queryStudentId = Number(student_id);
+          if (parentStudentIds.includes(queryStudentId)) {
+            where.student_id = queryStudentId;
+          } else {
+            where.student_id = -1;
+          }
+        } else {
+          where.student_id = { in: parentStudentIds };
+        }
+      } else {
+        where.student_id = -1;
+      }
+    } else {
+      // TEACHER, ADMIN
+      if (class_instance_id) {
+        where.student = { class_instance_id: Number(class_instance_id) };
+      }
+      if (student_id) {
+        where.student_id = Number(student_id);
+      }
     }
+
     const conducts = await prisma.conduct.findMany({
       where,
       include: {
@@ -30,7 +67,7 @@ router.get('/', authorize('TEACHER'), async (req, res, next) => {
 });
 
 // PUT /conducts/upsert — create or update a conduct record for a student
-router.put('/upsert', authorize('TEACHER'), async (req, res, next) => {
+router.put('/upsert', authorize('TEACHER', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try {
     const { student_id, semester, year_id, rating, note } = req.body;
 
@@ -42,7 +79,7 @@ router.put('/upsert', authorize('TEACHER'), async (req, res, next) => {
     if (!student?.class_instance) {
       return res.status(400).json({ success: false, message: 'Học sinh chưa có lớp' });
     }
-    if (student.class_instance.homeroom_teacher_id !== req.user.userId) {
+    if (student.class_instance.homeroom_teacher_id !== Number(req.user.userId)) {
       return res.status(403).json({ success: false, message: 'Chỉ GVCN mới được đánh giá hạnh kiểm' });
     }
 

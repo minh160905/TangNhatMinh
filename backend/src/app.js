@@ -17,6 +17,7 @@ const notificationsRouter = require('./modules/notifications/notifications.route
 const commentsRouter = require('./modules/comments/comments.router');
 const conductRouter = require('./modules/comments/conduct.router');
 const schedulesRouter = require('./modules/schedules/schedules.router');
+const departmentsRouter = require('./modules/departments/departments.router');
 const { errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/conducts', conductRouter);
 app.use('/api/schedules', schedulesRouter);
+app.use('/api/departments', departmentsRouter);
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));

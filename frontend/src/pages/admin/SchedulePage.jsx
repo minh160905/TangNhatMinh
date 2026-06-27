@@ -91,8 +91,8 @@ export default function AdminSchedulePage() {
     queryFn: () => subjectsApi.getAll().then(r => r.data.data),
   });
   const { data: teachers = [] } = useQuery({
-    queryKey: ['users', { role: 'TEACHER' }],
-    queryFn: () => usersApi.getAll({ role: 'TEACHER' }).then(r => r.data.data),
+    queryKey: ['users', { role: ['TEACHER', 'HEAD_OF_DEPARTMENT', 'PRINCIPAL'] }],
+    queryFn: () => usersApi.getAll({ role: ['TEACHER', 'HEAD_OF_DEPARTMENT', 'PRINCIPAL'] }).then(r => r.data.data),
   });
   const { data: years = [] } = useQuery({
     queryKey: ['years'],

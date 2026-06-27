@@ -34,7 +34,7 @@ router.post(
 );
 
 // ── PUT review achievement (GVCN only) ───────────────────────────────────
-router.put('/:id/review', authorize('TEACHER'), async (req, res, next) => {
+router.put('/:id/review', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try {
     const { status, comment } = req.body;
     success(res, await svc.review(req.params.id, status, req.user.userId, comment));
@@ -42,14 +42,14 @@ router.put('/:id/review', authorize('TEACHER'), async (req, res, next) => {
 });
 
 // ── POST add comment on achievement ──────────────────────────────────────
-router.post('/:id/comments', authorize('TEACHER'), async (req, res, next) => {
+router.post('/:id/comments', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), async (req, res, next) => {
   try {
     created(res, await svc.addComment(req.params.id, req.user.userId, req.body.comment));
   } catch (e) { next(e); }
 });
 
 // ── DELETE file from achievement (student can delete own pending files) ──
-router.delete('/files/:fileId', authorize('STUDENT', 'TEACHER', 'ADMIN'), async (req, res, next) => {
+router.delete('/files/:fileId', authorize('STUDENT', 'TEACHER', 'HEAD_OF_DEPARTMENT', 'PRINCIPAL', 'ADMIN'), async (req, res, next) => {
   try {
     success(res, await svc.deleteFile(req.params.fileId), 'File đã được xóa');
   } catch (e) { next(e); }

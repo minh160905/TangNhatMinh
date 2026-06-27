@@ -17,8 +17,35 @@ const getAll = async (filters = {}) => {
   });
 };
 
-const create = async (data) =>
-  prisma.teacherAssignment.create({
+const checkAssignmentPermission = async (user, subjectId, teacherId) => {
+  if (user.role === 'HEAD_OF_DEPARTMENT') {
+    const dept = await prisma.department.findUnique({
+      where: { head_teacher_id: Number(user.userId) },
+    });
+    if (!dept) {
+      throw { statusCode: 403, message: 'Bạn không phải là tổ trưởng của tổ chuyên môn nào' };
+    }
+
+    if (Number(subjectId) !== dept.subject_id) {
+      throw { statusCode: 403, message: `Bạn chỉ có quyền phân công môn học thuộc tổ chuyên môn của mình (${dept.department_name})` };
+    }
+
+    if (teacherId) {
+      const isMember = await prisma.departmentMember.findUnique({
+        where: { department_id_teacher_id: { department_id: dept.department_id, teacher_id: Number(teacherId) } },
+      });
+      if (!isMember) {
+        throw { statusCode: 403, message: 'Giáo viên được phân công phải là thành viên trong tổ chuyên môn của bạn' };
+      }
+    }
+    return dept;
+  }
+};
+
+const create = async (data, user) => {
+  await checkAssignmentPermission(user, data.subject_id, data.teacher_id);
+  
+  return prisma.teacherAssignment.create({
     data: {
       teacher_id: Number(data.teacher_id),
       class_instance_id: Number(data.class_instance_id),
@@ -30,11 +57,32 @@ const create = async (data) =>
       subject: true,
     },
   });
+};
 
-const remove = async (id) => prisma.teacherAssignment.delete({ where: { assignment_id: Number(id) } });
+const remove = async (id, user) => {
+  const numId = Number(id);
+  const assignment = await prisma.teacherAssignment.findUnique({ where: { assignment_id: numId } });
+  if (!assignment) throw { statusCode: 404, message: 'Phân công không tồn tại' };
 
-const batchRemove = async (ids) =>
-  prisma.teacherAssignment.deleteMany({ where: { assignment_id: { in: ids.map(Number) } } });
+  await checkAssignmentPermission(user, assignment.subject_id, assignment.teacher_id);
+
+  return prisma.teacherAssignment.delete({ where: { assignment_id: numId } });
+};
+
+const batchRemove = async (ids, user) => {
+  const numIds = ids.map(Number);
+  
+  if (user.role === 'HEAD_OF_DEPARTMENT') {
+    for (const numId of numIds) {
+      const assignment = await prisma.teacherAssignment.findUnique({ where: { assignment_id: numId } });
+      if (assignment) {
+        await checkAssignmentPermission(user, assignment.subject_id, assignment.teacher_id);
+      }
+    }
+  }
+
+  return prisma.teacherAssignment.deleteMany({ where: { assignment_id: { in: numIds } } });
+};
 
 // Get subjects that a teacher teaches in a given class instance
 const getTeacherSubjectsInClass = async (teacherId, classInstanceId) =>
@@ -46,8 +94,29 @@ const getTeacherSubjectsInClass = async (teacherId, classInstanceId) =>
 /**
  * Thống kê tải giáo viên: mỗi GV dạy bao nhiêu lớp & môn
  */
-const getTeacherWorkload = async () => {
+const getTeacherWorkload = async (user) => {
+  const where = {};
+  const scheduleWhere = {};
+
+  if (user && user.role === 'HEAD_OF_DEPARTMENT') {
+    const dept = await prisma.department.findUnique({
+      where: { head_teacher_id: Number(user.userId) },
+      include: { members: true },
+    });
+    if (dept) {
+      const memberIds = dept.members.map(m => m.teacher_id);
+      where.subject_id = dept.subject_id;
+      where.teacher_id = { in: memberIds };
+
+      scheduleWhere.subject_id = dept.subject_id;
+      scheduleWhere.teacher_id = { in: memberIds };
+    } else {
+      return [];
+    }
+  }
+
   const assignments = await prisma.teacherAssignment.findMany({
+    where,
     include: {
       teacher: { select: { user_id: true, full_name: true, username: true } },
       subject: { select: { subject_name: true } },
@@ -63,11 +132,13 @@ const getTeacherWorkload = async () => {
   // Lấy số tiết/tuần từ bảng schedules (group by teacher_id)
   const scheduleGroups = await prisma.schedule.groupBy({
     by: ['teacher_id'],
+    where: scheduleWhere,
     _count: { schedule_id: true },
   });
 
   // Lấy chi tiết từng tiết theo teacher + class để hiển thị phân rã
   const scheduleDetails = await prisma.schedule.findMany({
+    where: scheduleWhere,
     select: {
       teacher_id: true,
       class_instance_id: true,
@@ -137,9 +208,23 @@ const getTeacherWorkload = async () => {
  * Ma trận phân công: lớp × môn → tên GV
  * Filter theo year_id
  */
-const getMatrix = async (yearId) => {
+const getMatrix = async (yearId, user) => {
   const where = {};
   if (yearId) where.class_instance = { year_id: Number(yearId) };
+
+  if (user && user.role === 'HEAD_OF_DEPARTMENT') {
+    const dept = await prisma.department.findUnique({
+      where: { head_teacher_id: Number(user.userId) },
+      include: { members: true },
+    });
+    if (dept) {
+      const memberIds = dept.members.map(m => m.teacher_id);
+      where.subject_id = dept.subject_id;
+      where.teacher_id = { in: memberIds };
+    } else {
+      return { classes: [], subjects: [], cells: {} };
+    }
+  }
 
   const assignments = await prisma.teacherAssignment.findMany({
     where,

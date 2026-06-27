@@ -4,7 +4,7 @@ const prisma = require('../../config/prisma');
  * Get full score report for a student (grouped by subject)
  * Used by STUDENT and PARENT
  */
-const getStudentReport = async (studentId, semester) => {
+const getStudentReport = async (studentId, semester, yearId) => {
   const student = await prisma.student.findUnique({
     where: { student_id: Number(studentId) },
     include: {
@@ -14,8 +14,14 @@ const getStudentReport = async (studentId, semester) => {
   });
   if (!student) throw { statusCode: 404, message: 'Student not found' };
 
+  const scoreWhere = { student_id: Number(studentId), semester: Number(semester) };
+  const targetYearId = yearId ? Number(yearId) : student.class_instance?.year_id;
+  if (targetYearId) {
+    scoreWhere.year_id = targetYearId;
+  }
+
   const scores = await prisma.score.findMany({
-    where: { student_id: Number(studentId), semester: Number(semester) },
+    where: scoreWhere,
     include: { subject: true },
     orderBy: [{ subject: { subject_name: 'asc' } }, { order_no: 'asc' }],
   });
@@ -66,6 +72,45 @@ const getStudentReport = async (studentId, semester) => {
   const dtbList = subjects.map(s => s.dtb).filter(d => d !== null);
   const overall_avg = dtbList.length ? Math.round((dtbList.reduce((a, b) => a + b, 0) / dtbList.length) * 100) / 100 : null;
 
+  // 1. Fetch Conduct
+  const conductRecord = await prisma.conduct.findFirst({
+    where: {
+      student_id: Number(studentId),
+      semester: Number(semester),
+      year_id: targetYearId ? Number(targetYearId) : -1,
+    },
+  });
+  const conductMap = {
+    EXCELLENT: 'Tốt',
+    GOOD: 'Khá',
+    AVERAGE: 'Trung bình',
+    WEAK: 'Yếu',
+  };
+  const conduct_classification = conductRecord ? (conductMap[conductRecord.rating] || conductRecord.rating) : 'Chưa đánh giá';
+
+  // 2. Calculate Academic Performance (Học lực)
+  let academic_classification = 'Chưa xếp loại';
+  if (overall_avg !== null) {
+    const dtbs = subjects.map(s => s.dtb);
+    const hasNull = dtbs.some(d => d === null);
+    if (hasNull) {
+      academic_classification = 'Chưa hoàn thành';
+    } else {
+      const minDtb = Math.min(...dtbs);
+      if (overall_avg >= 8.0 && minDtb >= 6.5) {
+        academic_classification = 'Giỏi';
+      } else if (overall_avg >= 6.5 && minDtb >= 5.0) {
+        academic_classification = 'Khá';
+      } else if (overall_avg >= 5.0 && minDtb >= 3.5) {
+        academic_classification = 'Trung bình';
+      } else if (overall_avg >= 3.5 && minDtb >= 2.0) {
+        academic_classification = 'Yếu';
+      } else {
+        academic_classification = 'Kém';
+      }
+    }
+  }
+
   return {
     student: {
       student_id: student.student_id,
@@ -77,6 +122,8 @@ const getStudentReport = async (studentId, semester) => {
     semester,
     subjects,
     overall_avg,
+    academic_classification,
+    conduct_classification,
   };
 };
 

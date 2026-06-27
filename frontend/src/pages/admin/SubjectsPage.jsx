@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
   Button, Modal, Form, Input, Drawer, Table, Tag, Typography,
-  Avatar, Spin, Empty, Select, Tabs, Popconfirm, Divider, Space,
+  Avatar, Spin, Empty, Tabs,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, UserOutlined, MailOutlined,
-  PhoneOutlined, TeamOutlined, DeleteOutlined, CheckCircleOutlined,
+  PhoneOutlined, TeamOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { subjectsApi, assignmentsApi, classesApi, usersApi } from '../../api';
+import { subjectsApi } from '../../api';
 import { App } from 'antd';
 
 const { Text } = Typography;
@@ -31,12 +31,10 @@ export default function SubjectsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [edit, setEdit] = useState(null);
   const [form] = Form.useForm();
-  const [assignForm] = Form.useForm();
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeSubject, setActiveSubject] = useState(null);
-  const [drawerTab, setDrawerTab] = useState('teachers');
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const { data: subjects = [], isLoading: subjectsLoading } = useQuery({
@@ -50,24 +48,6 @@ export default function SubjectsPage() {
     enabled: !!activeSubject,
   });
 
-  // Lấy danh sách phân công hiện tại cho môn này (để hiển thị + xóa)
-  const { data: subjectAssignments = [], isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['assignments', { subject_id: activeSubject?.subject_id }],
-    queryFn: () => assignmentsApi.getAll({ subject_id: activeSubject.subject_id }).then(r => r.data.data),
-    enabled: !!activeSubject,
-  });
-
-  // Danh sách giáo viên & lớp cho form phân công
-  const { data: teachers = [] } = useQuery({
-    queryKey: ['users', { role: 'TEACHER' }],
-    queryFn: () => usersApi.getAll({ role: 'TEACHER' }).then(r => r.data.data),
-  });
-
-  const { data: instances = [] } = useQuery({
-    queryKey: ['instances'],
-    queryFn: () => classesApi.getInstances().then(r => r.data.data),
-  });
-
   // ── Mutations ─────────────────────────────────────────────────────────────
   const createMut = useMutation({
     mutationFn: (d) => subjectsApi.create(d),
@@ -78,30 +58,6 @@ export default function SubjectsPage() {
     onSuccess: () => { qc.invalidateQueries(['subjects']); setModalOpen(false); message.success('Cập nhật thành công'); },
   });
 
-  const assignMut = useMutation({
-    mutationFn: (d) => assignmentsApi.create(d),
-    onSuccess: () => {
-      qc.invalidateQueries(['assignments']);
-      qc.invalidateQueries(['subject-teachers', activeSubject?.subject_id]);
-      qc.invalidateQueries(['assignments-workload']);
-      qc.invalidateQueries(['assignments-matrix']);
-      assignForm.resetFields();
-      message.success('Phân công thành công!');
-    },
-    onError: (e) => message.error(e.response?.data?.message || 'Lỗi phân công (có thể đã tồn tại)'),
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: (id) => assignmentsApi.remove(id),
-    onSuccess: () => {
-      qc.invalidateQueries(['assignments']);
-      qc.invalidateQueries(['subject-teachers', activeSubject?.subject_id]);
-      qc.invalidateQueries(['assignments-workload']);
-      qc.invalidateQueries(['assignments-matrix']);
-      message.success('Đã xóa phân công');
-    },
-  });
-
   const openModal = (sub = null) => {
     setEdit(sub);
     sub ? form.setFieldsValue(sub) : form.resetFields();
@@ -110,67 +66,14 @@ export default function SubjectsPage() {
 
   const openDrawer = (subject) => {
     setActiveSubject(subject);
-    setDrawerTab('teachers');
     setDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
     setActiveSubject(null);
-    assignForm.resetFields();
   };
 
-  // ── Assignment columns ─────────────────────────────────────────────────────
-  const assignmentColumns = [
-    {
-      title: 'Giáo viên',
-      render: (_, r) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-            background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#4F46E5', fontWeight: 700, fontSize: 15,
-          }}>{r.teacher?.full_name?.[0]}</div>
-          <div>
-            <div style={{ color: '#111827', fontWeight: 600 }}>{r.teacher?.full_name}</div>
-            <div style={{ color: '#94A3B8', fontSize: 12 }}>@{r.teacher?.username}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Lớp học',
-      render: (_, r) => (
-        <Tag color="purple" style={{ fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '2px 10px' }}>
-          {r.class_instance?.grade}{r.class_instance?.class?.class_code}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Năm học',
-      render: (_, r) => (
-        <Text style={{ color: '#6B7280', fontSize: 13 }}>{r.class_instance?.year?.name}</Text>
-      ),
-    },
-    {
-      title: '',
-      width: 70,
-      render: (_, r) => (
-        <Popconfirm
-          title="Xóa phân công này?"
-          onConfirm={() => deleteMut.mutate(r.assignment_id)}
-          okText="Xóa" cancelText="Hủy"
-          okButtonProps={{ danger: true }}
-        >
-          <Button
-            type="text" danger size="small" icon={<DeleteOutlined />}
-            loading={deleteMut.isPending}
-          />
-        </Popconfirm>
-      ),
-    },
-  ];
 
   // ── Teacher (view) columns ──────────────────────────────────────────────────
   const teacherViewColumns = [
@@ -278,7 +181,7 @@ export default function SubjectsPage() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: c1, fontSize: 12, fontWeight: 500 }}>
                   <TeamOutlined style={{ fontSize: 11 }} />
-                  <span>Xem GV · Phân công</span>
+                  <span>Xem giáo viên phụ trách</span>
                 </div>
               </div>
 
@@ -334,7 +237,7 @@ export default function SubjectsPage() {
                 {activeSubject?.subject_name}
               </div>
               <div style={{ color: '#4F46E5', fontSize: 12, fontWeight: 500 }}>
-                Giáo viên phụ trách · Phân công
+                Giáo viên phụ trách môn học
               </div>
             </div>
           </div>
@@ -346,12 +249,10 @@ export default function SubjectsPage() {
         }}
       >
         <Tabs
-          activeKey={drawerTab}
-          onChange={setDrawerTab}
           style={{ padding: '0 20px' }}
           tabBarStyle={{ paddingTop: 12, marginBottom: 0 }}
           items={[
-            // ── Tab 1: Danh sách GV ─────────────────────────────────────────
+            // ── Tab duy nhất: Danh sách GV ────────────────────────────────────
             {
               key: 'teachers',
               label: <span><UserOutlined /> Giáo viên phụ trách</span>,
@@ -401,137 +302,7 @@ export default function SubjectsPage() {
                   )}
                 </div>
               ),
-            },
-
-            // ── Tab 2: Phân công môn học ─────────────────────────────────────
-            {
-              key: 'assign',
-              label: <span><CheckCircleOutlined /> Phân công</span>,
-              children: (
-                <div style={{ padding: '16px 0' }}>
-                  {/* Form thêm phân công mới */}
-                  <div style={{
-                    background: '#fff',
-                    border: '1px solid rgba(79,70,229,0.2)',
-                    borderRadius: 14,
-                    padding: '20px',
-                    marginBottom: 20,
-                    boxShadow: '0 2px 8px rgba(79,70,229,0.06)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: 8,
-                        background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 13,
-                      }}>➕</div>
-                      <Text strong style={{ color: '#4F46E5', fontSize: 14 }}>
-                        Thêm phân công mới — Môn: <span style={{ color: '#111827' }}>{activeSubject?.subject_name}</span>
-                      </Text>
-                    </div>
-
-                    <Form
-                      form={assignForm}
-                      layout="vertical"
-                      onFinish={(values) =>
-                        assignMut.mutate({
-                          teacher_id: values.teacher_id,
-                          class_instance_id: values.class_instance_id,
-                          subject_id: activeSubject.subject_id,
-                        })
-                      }
-                    >
-                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                        <Form.Item
-                          name="teacher_id"
-                          label="Giáo viên"
-                          rules={[{ required: true, message: 'Vui lòng chọn giáo viên' }]}
-                          style={{ flex: 1, minWidth: 200, marginBottom: 8 }}
-                        >
-                          <Select
-                            placeholder="Chọn giáo viên..."
-                            showSearch
-                            filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
-                            options={teachers.map(t => ({
-                              value: t.user_id,
-                              label: t.full_name,
-                            }))}
-                            optionRender={(opt) => (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{
-                                  width: 26, height: 26, borderRadius: 6,
-                                  background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  color: '#4F46E5', fontWeight: 700, fontSize: 12, flexShrink: 0,
-                                }}>{opt.label?.[0]}</div>
-                                <span style={{ color: '#111827' }}>{opt.label}</span>
-                              </div>
-                            )}
-                          />
-                        </Form.Item>
-
-                        <Form.Item
-                          name="class_instance_id"
-                          label="Lớp học"
-                          rules={[{ required: true, message: 'Vui lòng chọn lớp' }]}
-                          style={{ flex: 1, minWidth: 200, marginBottom: 8 }}
-                        >
-                          <Select
-                            placeholder="Chọn lớp..."
-                            showSearch
-                            filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
-                            options={instances.map(inst => ({
-                              value: inst.class_instance_id,
-                              label: `${inst.grade}${inst.class?.class_code} – ${inst.year?.name}`,
-                            }))}
-                          />
-                        </Form.Item>
-                      </div>
-
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        icon={<PlusOutlined />}
-                        loading={assignMut.isPending}
-                        style={{
-                          background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                          border: 'none', borderRadius: 8,
-                          height: 38, paddingInline: 24,
-                        }}
-                      >
-                        Xác nhận phân công
-                      </Button>
-                    </Form>
-                  </div>
-
-                  {/* Danh sách phân công hiện tại */}
-                  <div>
-                    <Text strong style={{ color: '#374151', fontSize: 13, marginBottom: 10, display: 'block' }}>
-                      📋 Các phân công hiện tại ({subjectAssignments.length})
-                    </Text>
-
-                    {assignmentsLoading ? (
-                      <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                    ) : subjectAssignments.length === 0 ? (
-                      <Empty
-                        description={<span style={{ color: '#9CA3AF', fontSize: 13 }}>Chưa có phân công nào cho môn này</span>}
-                        style={{ padding: '24px 0' }}
-                      />
-                    ) : (
-                      <Table
-                        dataSource={subjectAssignments}
-                        columns={assignmentColumns}
-                        rowKey="assignment_id"
-                        pagination={false}
-                        size="small"
-                        style={{ borderRadius: 12, overflow: 'hidden', background: '#fff' }}
-                        locale={{ emptyText: 'Chưa có phân công' }}
-                      />
-                    )}
-                  </div>
-                </div>
-              ),
-            },
+            }
           ]}
         />
       </Drawer>

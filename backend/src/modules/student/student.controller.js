@@ -3,7 +3,7 @@ const { success, badRequest } = require('../../utils/response');
 
 const getReport = async (req, res, next) => {
   try {
-    const { semester = 1, studentId } = req.query;
+    const { semester = 1, studentId, yearId } = req.query;
     let targetStudentId;
 
     if (req.user.role === 'STUDENT') {
@@ -18,7 +18,7 @@ const getReport = async (req, res, next) => {
       targetStudentId = studentId;
     }
 
-    const report = await svc.getStudentReport(targetStudentId, semester);
+    const report = await svc.getStudentReport(targetStudentId, semester, yearId);
     return success(res, report);
   } catch (e) { next(e); }
 };

@@ -12,16 +12,17 @@ router.post('/', authorize('ADMIN'), ctrl.createClass);
 // Academic years
 router.get('/years', ctrl.getAllYears);
 router.post('/years', authorize('ADMIN'), ctrl.createYear);
+router.patch('/years/:id/toggle-lock', authorize('ADMIN'), ctrl.toggleYearLock);
 
 // My classes (for teacher)
-router.get('/my-classes', authorize('TEACHER'), ctrl.getMyClasses);
-router.get('/my-homeroom-class', authorize('TEACHER'), ctrl.getMyHomeroomClass);
+router.get('/my-classes', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), ctrl.getMyClasses);
+router.get('/my-homeroom-class', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT'), ctrl.getMyHomeroomClass);
 
 // Class instances
 router.get('/instances', ctrl.getAllInstances);
 router.post('/instances', authorize('ADMIN'), ctrl.createInstance);
 router.put('/instances/:id', authorize('ADMIN'), ctrl.updateInstance);
 router.get('/instances/:id/students', ctrl.getInstanceStudents);
-router.get('/instances/:id/homeroom-detail', authorize('TEACHER'), ctrl.getHomeroomClassDetail);
+router.get('/instances/:id/homeroom-detail', authorize('TEACHER', 'PRINCIPAL', 'HEAD_OF_DEPARTMENT', 'ADMIN'), ctrl.getHomeroomClassDetail);
 
 module.exports = router;

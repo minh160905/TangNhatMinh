@@ -45,15 +45,41 @@ const getAll = async (filters = {}, user) => {
       where: { user_id: user.userId },
       include: { students: true },
     });
-    if (parent) where.student_id = { in: parent.students.map(sp => sp.student_id) };
-  } else if (user.role === 'TEACHER') {
+    if (parent) {
+      const parentStudentIds = parent.students.map(sp => sp.student_id);
+      if (filters.studentId) {
+        const queryStudentId = Number(filters.studentId);
+        if (parentStudentIds.includes(queryStudentId)) {
+          where.student_id = queryStudentId;
+        } else {
+          where.student_id = -1;
+        }
+      } else {
+        where.student_id = { in: parentStudentIds };
+      }
+    }
+  } else if (['TEACHER', 'HEAD_OF_DEPARTMENT'].includes(user.role)) {
     // GVCN only sees achievements of students in their homeroom classes
     const classInstances = await prisma.classInstance.findMany({
-      where: { homeroom_teacher_id: user.userId },
+      where: { homeroom_teacher_id: Number(user.userId) },
       include: { students: true },
     });
     const studentIds = classInstances.flatMap(ci => ci.students.map(s => s.student_id));
-    where.student_id = { in: studentIds };
+    if (filters.studentId) {
+      const queryStudentId = Number(filters.studentId);
+      if (studentIds.includes(queryStudentId)) {
+        where.student_id = queryStudentId;
+      } else {
+        where.student_id = -1;
+      }
+    } else {
+      where.student_id = { in: studentIds };
+    }
+  } else if (['ADMIN', 'PRINCIPAL'].includes(user.role)) {
+    // Admin and Principal see all achievements
+    if (filters.studentId) {
+      where.student_id = Number(filters.studentId);
+    }
   }
 
   if (filters.status) where.status = filters.status;
@@ -78,7 +104,14 @@ const review = async (id, status, teacherUserId, comment) => {
   if (!achievement) throw { statusCode: 404, message: 'Achievement not found' };
 
   const ci = achievement.student.class_instance;
-  if (!ci || ci.homeroom_teacher_id !== teacherUserId) {
+  // PRINCIPAL has school-wide authority and can review any achievement
+  // Regular teachers must be the homeroom teacher of the student's class
+  const user = await prisma.user.findUnique({
+    where: { user_id: Number(teacherUserId) },
+    include: { role: true },
+  });
+  const isPrincipal = user?.role?.role_name === 'PRINCIPAL';
+  if (!isPrincipal && (!ci || ci.homeroom_teacher_id !== Number(teacherUserId))) {
     throw { statusCode: 403, message: 'Chỉ GVCN của lớp mới có thể duyệt thành tích này' };
   }
 

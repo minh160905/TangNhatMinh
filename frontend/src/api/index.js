@@ -27,6 +27,7 @@ export const classesApi = {
   getMyClasses: () => api.get('/classes/my-classes'),
   getMyHomeroomClass: () => api.get('/classes/my-homeroom-class'),
   getHomeroomClassDetail: (id) => api.get(`/classes/instances/${id}/homeroom-detail`),
+  toggleYearLock: (id, data) => api.patch(`/classes/years/${id}/toggle-lock`, data),
 };
 
 export const subjectsApi = {
@@ -34,6 +35,14 @@ export const subjectsApi = {
   getTeachersBySubject: (id) => api.get(`/subjects/${id}/teachers`),
   create: (data) => api.post('/subjects', data),
   update: (id, data) => api.put(`/subjects/${id}`, data),
+};
+
+export const departmentsApi = {
+  getAll: () => api.get('/departments'),
+  getMyDepartment: () => api.get('/departments/my-department'),
+  assignHead: (id, teacherId) => api.post(`/departments/${id}/head`, { teacher_id: teacherId }),
+  addMember: (id, teacherId) => api.post(`/departments/${id}/members`, { teacher_id: teacherId }),
+  removeMember: (id, teacherId) => api.delete(`/departments/${id}/members/${teacherId}`),
 };
 
 export const assignmentsApi = {
@@ -51,6 +60,7 @@ export const scoresApi = {
   upsert: (data) => api.post('/scores', data),
   batchUpsert: (scores) => api.post('/scores/batch', { scores }),
   update: (id, data) => api.put(`/scores/${id}`, data),
+  getStudentHistory: (params) => api.get('/scores/student-history', { params }),
 };
 
 export const studentApi = {
