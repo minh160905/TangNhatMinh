@@ -423,7 +423,7 @@ export default function AssignmentsPage() {
                         ))}
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
                         {workload.map((w, i) => {
                           const maxPeriods = Math.max(...workload.map(x => x.weekly_periods || 0), 1);
                           const maxAssign = Math.max(...workload.map(x => x.total_assignments), 1);
